@@ -1,4 +1,4 @@
-package com.clideOffice.ocr_project;
+package com.clideOffice.clideApp.common.ocr_project;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
