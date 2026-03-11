@@ -17,8 +17,9 @@ public class SdsVersion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "sds_id")
-    private Long sdsId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sds_id")
+    private SdsMaster sdsMaster;
 
     @Column(name = "version_number")
     private Integer versionNumber;

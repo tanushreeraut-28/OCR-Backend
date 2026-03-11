@@ -27,4 +27,14 @@ public class SdsOcrResult {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+    
+
+	@Column(name = "user_id")
+	private Integer userId;
+	
+	@Column(name = "assigned_at")
+	private LocalDateTime assignedAt;
+	
+	@Column(name = "notes")
+	private String notes;
 }

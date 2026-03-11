@@ -13,11 +13,13 @@ public class SdsSection1 {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "sds_id")
-    private Long sdsId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sds_id")
+    private SdsMaster sdsMaster;
 
-    @Column(name = "version_id")
-    private Long versionId;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "version_id")
+    private SdsVersion version;
 
     @Column(name = "product_identifier", nullable = false)
     private String productIdentifier;

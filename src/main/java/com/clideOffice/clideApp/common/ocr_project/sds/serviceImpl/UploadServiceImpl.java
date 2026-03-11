@@ -1,6 +1,7 @@
 package com.clideOffice.clideApp.common.ocr_project.sds.serviceImpl;
 
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,9 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
-
-import com.clideOffice.clideApp.common.ocr_project.util.BucketContextHolder;
-import com.clideOffice.clideApp.common.ocr_project.util.DatabaseContextHolder;
+import com.amazonaws.services.s3.model.PutObjectRequest;
 
 import com.clideOffice.clideApp.common.ocr_project.sds.interfaces.UploadProjection;
 import com.clideOffice.clideApp.common.ocr_project.sds.repository.UploadRepository;
@@ -27,12 +26,14 @@ import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UploadRespons
 import com.clideOffice.clideApp.common.ocr_project.sds.service.UploadService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import net.sourceforge.tess4j.ITesseract;
 import net.sourceforge.tess4j.Tesseract;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UploadServiceImpl implements UploadService {
 
     private final UploadRepository uploadRepository;
@@ -41,13 +42,16 @@ public class UploadServiceImpl implements UploadService {
     @Value("${amazon.url}")
     private String amazonUrl;
 
+    @Value("${aws.s3.bucket.qaclide}")
+    private String bucketName;
+
     @Value("${tesseract.datapath}")
     private String tessDataPath;
 
     private static final List<String> ALLOWED_TYPES = List.of(
             "pdf","doc","docx","txt",
             "jpg","jpeg","png","bmp",
-            "tiff","tif","gif","webp","heic"
+            "tiff","tif","gif","webp"
     );
 
     @Override
@@ -57,14 +61,6 @@ public class UploadServiceImpl implements UploadService {
 
         try {
 
-            /*
-            =====================
-            SET DATABASE CONTEXT
-            =====================
-            */
-
-            DatabaseContextHolder.setDatabase("qaclide");
-
             MultipartFile file = request.getFile();
 
             if(file == null || file.isEmpty()){
@@ -73,73 +69,64 @@ public class UploadServiceImpl implements UploadService {
 
             validateFileType(file);
 
-            /*
-            =====================
-            UPLOAD FILE TO S3
-            =====================
-            */
-
-            String bucketName = BucketContextHolder.getBucketName(
-                    DatabaseContextHolder.getDatabase()
-            );
-
             String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-
-            String filePath = "sds/" + fileName;
+            String s3Key = "sds/" + fileName;
 
             ObjectMetadata metadata = new ObjectMetadata();
             metadata.setContentLength(file.getSize());
+            metadata.setContentType(file.getContentType());
 
             amazonS3.putObject(
-                    bucketName,
-                    filePath,
-                    file.getInputStream(),
-                    metadata
+                    new PutObjectRequest(
+                            bucketName,
+                            s3Key,
+                            new ByteArrayInputStream(file.getBytes()),
+                            metadata
+                    )
             );
 
-            String fileUrl = amazonUrl + "/" + bucketName + "/" + filePath;
+            String fileUrl = amazonS3.getUrl(bucketName, s3Key).toString();
 
-            /*
-            =====================
-            RUN OCR
-            =====================
-            */
-
+            // OCR
             String rawText = runOCR(file);
+
+            log.info("===== OCR EXTRACTED TEXT START =====");
+            log.info(rawText);
+            log.info("===== OCR EXTRACTED TEXT END =====");
+
+            String cleanedText = cleanOcrText(rawText);
+
+            log.info("===== CLEANED OCR TEXT =====");
+            log.info(cleanedText);
 
             double confidenceScore = 0.90;
 
-            String productIdentifier = extractProductIdentifier(rawText);
+            String productIdentifier = extractProductIdentifier(cleanedText);
 
-            /*
-            =====================
-            DUPLICATE DETECTION
-            =====================
-            */
+            log.info("Extracted Product Identifier: {}", productIdentifier);
 
-            UploadProjection duplicate = uploadRepository.findDuplicateSds(productIdentifier);
+            if(productIdentifier == null || productIdentifier.isBlank()){
+                response.setStatus("OCR_FAILED");
+                response.setMessage("Product Identifier not detected");
+                response.setFileUrl(fileUrl);
+                return response;
+            }
+
+            // DUPLICATE CHECK
+            UploadProjection duplicate =
+                    uploadRepository.findDuplicateSds(productIdentifier);
 
             if(duplicate != null){
 
-                uploadRepository.logDuplicate(
-                        productIdentifier,
-                        duplicate.getSdsId(),
-                        "DUPLICATE_DETECTED"
-                );
-
                 response.setStatus("DUPLICATE");
                 response.setSdsId(duplicate.getSdsId());
-                response.setMessage("Duplicate SDS detected");
+                response.setMessage("Duplicate SDS detected for product: " + productIdentifier);
+                response.setFileUrl(fileUrl);
 
                 return response;
             }
 
-            /*
-            =====================
-            INSERT SDS MASTER
-            =====================
-            */
-
+            // INSERT SDS MASTER
             uploadRepository.insertSdsMaster(
                     productIdentifier,
                     null,
@@ -148,12 +135,6 @@ public class UploadServiceImpl implements UploadService {
             );
 
             Long sdsId = uploadRepository.getSdsId(productIdentifier);
-
-            /*
-            =====================
-            INSERT VERSION
-            =====================
-            */
 
             uploadRepository.insertVersion(
                     sdsId,
@@ -164,12 +145,6 @@ public class UploadServiceImpl implements UploadService {
             );
 
             Long versionId = uploadRepository.getVersionId(sdsId);
-
-            /*
-            =====================
-            INSERT SECTION 1
-            =====================
-            */
 
             uploadRepository.insertSection1(
                     sdsId,
@@ -183,30 +158,11 @@ public class UploadServiceImpl implements UploadService {
                     "OCR"
             );
 
-            /*
-            =====================
-            SAVE OCR RESULT
-            =====================
-            */
-
             uploadRepository.saveOcrResult(
                     sdsId,
                     versionId,
                     rawText,
                     confidenceScore
-            );
-
-            /*
-            =====================
-            AUDIT LOG
-            =====================
-            */
-
-            uploadRepository.insertAuditLog(
-                    sdsId,
-                    "UPLOAD",
-                    1L,
-                    "SDS uploaded successfully"
             );
 
             response.setStatus("SUCCESS");
@@ -219,27 +175,13 @@ public class UploadServiceImpl implements UploadService {
 
         } catch (Exception e){
 
+            log.error("SDS Upload Error", e);
+
             throw new RuntimeException(
                     "Upload failed: " + e.getMessage()
             );
-
-        } finally {
-
-            /*
-            =====================
-            CLEAR DATABASE CONTEXT
-            =====================
-            */
-
-            DatabaseContextHolder.clear();
         }
     }
-
-    /*
-    =============================
-    FILE TYPE VALIDATION
-    =============================
-    */
 
     private void validateFileType(MultipartFile file){
 
@@ -249,24 +191,24 @@ public class UploadServiceImpl implements UploadService {
             throw new RuntimeException("Invalid file name");
         }
 
-        String extension = name.substring(name.lastIndexOf(".")+1).toLowerCase();
+        if(!name.contains(".")){
+            throw new RuntimeException("File extension missing");
+        }
+
+        String extension =
+                name.substring(name.lastIndexOf(".")+1).toLowerCase();
 
         if(!ALLOWED_TYPES.contains(extension)){
             throw new RuntimeException("Unsupported file type");
         }
     }
 
-    /*
-    =============================
-    OCR ENGINE
-    =============================
-    */
-
     private String runOCR(MultipartFile file) throws Exception {
 
-        String extension = file.getOriginalFilename()
-                .substring(file.getOriginalFilename().lastIndexOf(".")+1)
-                .toLowerCase();
+        String name = file.getOriginalFilename();
+
+        String extension =
+                name.substring(name.lastIndexOf(".")+1).toLowerCase();
 
         if(extension.equals("pdf")){
             return readPdf(file);
@@ -283,12 +225,6 @@ public class UploadServiceImpl implements UploadService {
         return readImage(file);
     }
 
-    /*
-    =============================
-    IMAGE OCR
-    =============================
-    */
-
     private String readImage(MultipartFile file) throws Exception {
 
         ITesseract tesseract = new Tesseract();
@@ -299,74 +235,93 @@ public class UploadServiceImpl implements UploadService {
         return tesseract.doOCR(image);
     }
 
-    /*
-    =============================
-    PDF OCR
-    =============================
-    */
-
     private String readPdf(MultipartFile file) throws Exception {
-
-        PDDocument document = PDDocument.load(file.getInputStream());
-
-        PDFRenderer renderer = new PDFRenderer(document);
-
-        ITesseract tesseract = new Tesseract();
-        tesseract.setDatapath(tessDataPath);
 
         StringBuilder text = new StringBuilder();
 
-        for(int i=0;i<document.getNumberOfPages();i++){
+        try(PDDocument document = PDDocument.load(file.getInputStream())){
 
-            BufferedImage image = renderer.renderImageWithDPI(i,300);
+            PDFRenderer renderer = new PDFRenderer(document);
 
-            text.append(
-                    tesseract.doOCR(image)
-            );
+            ITesseract tesseract = new Tesseract();
+            tesseract.setDatapath(tessDataPath);
+
+            for(int i=0;i<document.getNumberOfPages();i++){
+
+                BufferedImage image =
+                        renderer.renderImageWithDPI(i,300);
+
+                text.append(
+                        tesseract.doOCR(image)
+                ).append("\n");
+            }
         }
-
-        document.close();
 
         return text.toString();
     }
-
-    /*
-    =============================
-    WORD FILE READER
-    =============================
-    */
 
     private String readWord(MultipartFile file) throws Exception {
 
-        XWPFDocument doc = new XWPFDocument(file.getInputStream());
-
         StringBuilder text = new StringBuilder();
 
-        doc.getParagraphs().forEach(
-                p -> text.append(p.getText()).append("\n")
-        );
+        try(XWPFDocument doc =
+                new XWPFDocument(file.getInputStream())){
 
-        doc.close();
+            doc.getParagraphs().forEach(
+                    p -> text.append(p.getText()).append("\n")
+            );
+        }
 
         return text.toString();
     }
 
-    /*
-    =============================
-    PRODUCT IDENTIFIER EXTRACTION
-    =============================
-    */
+    private String cleanOcrText(String text){
+
+        if(text == null){
+            return "";
+        }
+
+        return text
+                .replaceAll("[^\\x00-\\x7F]", " ")
+                .replaceAll("[*]", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
 
     private String extractProductIdentifier(String text){
 
-        Pattern pattern = Pattern.compile("Product Identifier[:\\- ]*(.*)");
-
-        Matcher matcher = pattern.matcher(text);
-
-        if(matcher.find()){
-            return matcher.group(1).trim();
+        if(text == null || text.isBlank()){
+            return null;
         }
 
-        return "UNKNOWN_PRODUCT";
+        // Primary match
+        Pattern p1 = Pattern.compile(
+                "(Product Identifier|Product Name|Chemical Name|Substance Name)\\s*[:\\-]\\s*([A-Za-z0-9()\\- ]{2,80})",
+                Pattern.CASE_INSENSITIVE
+        );
+
+        Matcher m1 = p1.matcher(text);
+
+        if(m1.find()){
+            String value = m1.group(2).trim();
+            value = value.split("Other Name")[0].trim();
+            return value;
+        }
+
+        // Fallback
+        Pattern p2 = Pattern.compile(
+                "(Other Name of Identification|Other Identification|Synonym)\\s*[:\\-]\\s*([A-Za-z0-9()\\- ]{2,80})",
+                Pattern.CASE_INSENSITIVE
+        );
+
+        Matcher m2 = p2.matcher(text);
+
+        if(m2.find()){
+            String value = m2.group(2).trim();
+            value = value.replaceAll("[()]", "");
+            return value;
+        }
+
+        return null;
     }
 }
