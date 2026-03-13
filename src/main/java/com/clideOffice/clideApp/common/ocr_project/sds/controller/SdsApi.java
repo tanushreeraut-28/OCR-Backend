@@ -36,6 +36,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Validated
+@CrossOrigin(origins = "http://localhost:3000")
 @RequestMapping("/api") 
 @Tag(name = "SDS API", description = "Operations related to SDS Upload")
 public interface SdsApi {
