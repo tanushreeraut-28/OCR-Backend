@@ -14,8 +14,7 @@ import com.clideOffice.clideApp.common.ocr_project.sds.interfaces.UploadProjecti
 @Repository
 public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
 
-
-    /* ================= DUPLICATE DETECTION ================= */
+    /* ================= DUPLICATE DETECTION (FINAL FIXED) ================= */
     @Query(value = """
         SELECT 
             id AS sdsId,
@@ -23,20 +22,21 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             current_version AS currentVersion
         FROM sds_master
         WHERE LOWER(product_identifier) = LOWER(:productIdentifier)
+        AND LOWER(COALESCE(sds_number, '')) = LOWER(COALESCE(:sdsNumber, ''))
         """, nativeQuery = true)
     UploadProjection findDuplicateSds(
-            @Param("productIdentifier") String productIdentifier
+            @Param("productIdentifier") String productIdentifier,
+            @Param("sdsNumber") String sdsNumber
     );
-
 
     /* ================= INSERT SDS MASTER ================= */
     @Modifying
     @Transactional
     @Query(value = """
         INSERT INTO sds_master
-        (product_identifier, sds_number, manufacturer_info, current_version, status, created_by)
+        (product_identifier, sds_number, manufacturer_info, current_version, status, created_by, created_at, updated_at)
         VALUES
-        (:productIdentifier, :sdsNumber, :manufacturerInfo, 1, 'Draft', :createdBy)
+        (:productIdentifier, :sdsNumber, :manufacturerInfo, 1, 'Draft', :createdBy, NOW(), NOW())
         """, nativeQuery = true)
     void insertSdsMaster(
             @Param("productIdentifier") String productIdentifier,
@@ -45,17 +45,19 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("createdBy") Long createdBy
     );
 
-
-    /* ================= GET SDS ID ================= */
+    /* ================= GET SDS ID (FINAL FIXED) ================= */
     @Query(value = """
         SELECT id
         FROM sds_master
         WHERE LOWER(product_identifier) = LOWER(:productIdentifier)
+        AND LOWER(COALESCE(sds_number, '')) = LOWER(COALESCE(:sdsNumber, ''))
         ORDER BY id DESC
         LIMIT 1
         """, nativeQuery = true)
-    Long getSdsId(@Param("productIdentifier") String productIdentifier);
-
+    Long getSdsId(
+            @Param("productIdentifier") String productIdentifier,
+            @Param("sdsNumber") String sdsNumber
+    );
 
     /* ================= INSERT VERSION ================= */
     @Modifying
@@ -74,7 +76,6 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("uploadedBy") Long uploadedBy
     );
 
-
     /* ================= GET VERSION ID ================= */
     @Query(value = """
         SELECT id
@@ -85,8 +86,7 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
         """, nativeQuery = true)
     Long getVersionId(@Param("sdsId") Long sdsId);
 
-
-    /* ================= INSERT SECTION1 ================= */
+    /* ================= INSERT SECTION 1 ================= */
     @Modifying
     @Transactional
     @Query(value = """
@@ -109,7 +109,6 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("sourceType") String sourceType
     );
 
-
     /* ================= SAVE OCR RESULT ================= */
     @Modifying
     @Transactional
@@ -126,7 +125,6 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("confidenceScore") Double confidenceScore
     );
 
-
     /* ================= DUPLICATE LOG ================= */
     @Modifying
     @Transactional
@@ -142,6 +140,15 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("actionTaken") String actionTaken
     );
 
+    /* ================= UPDATE TIMESTAMP ================= */
+    @Modifying
+    @Transactional
+    @Query(value = """
+        UPDATE sds_master
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = :sdsId
+        """, nativeQuery = true)
+    void updateTimestamp(@Param("sdsId") Long sdsId);
 
     /* ================= AUDIT LOG ================= */
     @Modifying
@@ -158,5 +165,4 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("actionBy") Long actionBy,
             @Param("notes") String notes
     );
-
 }

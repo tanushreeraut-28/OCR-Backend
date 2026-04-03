@@ -6,10 +6,11 @@ import java.util.Optional;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;  // added
+import org.springframework.web.bind.annotation.RequestParam;  
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,17 +18,21 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.context.request.NativeWebRequest;
 
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.CreateVersionRequestDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.HandleHazardOcrRequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UpdateSection1RequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UploadRequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.ConfirmOCRResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.CreateVersionResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.DashboardSummaryResponseDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.DeleteHazardChildResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.DetailsResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.OcrExtractedDataResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.RemoveUserResponseDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UpdateSection1ResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.GetPlantResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.GetServiceResponseDto;
-import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UpdateSection1ResponseDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.HandleHazardOcrResponseDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.HazardMasterResponseDTO;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UploadResponseDto;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -104,4 +109,22 @@ public interface SdsApi {
     @ApiResponses({ @ApiResponse(responseCode = "200", description = "User removed successfully"),@ApiResponse(responseCode = "404", description = "User not found"),@ApiResponse(responseCode = "500", description = "Internal Server Error")})
     @PutMapping(value = "/sds/{userId}/remove", produces = "application/json")
     ResponseEntity<RemoveUserResponseDto> removeUser(@PathVariable Integer userId);
+    
+    /* ================= Delete (Generic for Child Items) API (2) ================= */
+    @Operation(summary = "Delete Hazard Child Item", description = "Delete hazard child item (statement / precaution / pictogram) using type and id")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Deleted successfully"), @ApiResponse(responseCode = "400", description = "Invalid type"), @ApiResponse(responseCode = "404", description = "Item not found"), @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    @DeleteMapping(value = "/sds/hazard/{type}/{id}", produces = "application/json")
+    ResponseEntity<DeleteHazardChildResponseDto> deleteHazardChild(@PathVariable String type,@PathVariable Long id);
+    
+    /* ================= Handle Hazard API ================= */
+    @Operation(summary = "SDS Section 2 Hazard OCR Preview & Confirmation",description = "Fetch OCR hazard data and either preview or confirm & save")
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "OCR processed successfully"), @ApiResponse(responseCode = "404", description = "SDS or OCR data not found"),@ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    @PostMapping(value = "/sds/{sdsId}/hazard/ocr", produces = "application/json")
+    ResponseEntity<HandleHazardOcrResponseDto> handleHazardOcr( @PathVariable Long sdsId,@RequestBody HandleHazardOcrRequestDto request);
+    
+    /* ================= Master Hazard Data API ================= */
+    @Operation(summary = "Get Hazard Master Data",description = "Fetch master data for Hazard Classification, Signal Word, Hazard Statements, and Precautionary Statements")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Master data fetched successfully"), @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    @GetMapping(value = "/api/master/hazard-data", produces = "application/json")
+    ResponseEntity<HazardMasterResponseDTO> getHazardMasterData();
 }

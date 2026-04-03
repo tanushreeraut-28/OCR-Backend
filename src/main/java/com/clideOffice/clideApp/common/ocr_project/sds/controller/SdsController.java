@@ -8,29 +8,36 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.CreateVersionRequestDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.HandleHazardOcrRequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UpdateSection1RequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UploadRequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.ConfirmOCRResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.CreateVersionResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.DashboardSummaryResponseDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.DeleteHazardChildResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.DetailsResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.OcrExtractedDataResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.RemoveUserResponseDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UpdateSection1ResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.GetPlantResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.GetServiceResponseDto;
-import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UpdateSection1ResponseDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.HandleHazardOcrResponseDto;  // ✅ ADD THISimport com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UpdateSection1ResponseDto;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.HazardMasterResponseDTO;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UploadResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.service.SdsService;
 
 import com.clideOffice.clideApp.common.ocr_project.util.DatabaseContextHolder;
 
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+
+//@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "*")
 @RestController
-@RequestMapping("/api")
 public class SdsController implements SdsApi {
 
 	private static final Logger logger = LoggerFactory.getLogger(SdsController.class);
@@ -38,25 +45,30 @@ public class SdsController implements SdsApi {
     	private final SdsService sdsService;
 	
 
-	public SdsController(
-     		SdsService sdsService
-			) {
+	public SdsController(SdsService sdsService) {
             this.sdsService = sdsService;
 	}
 
 	/* ================= SDS Upload API ================= */
-	
 	@Override
 	public ResponseEntity<UploadResponseDto> uploadSds(UploadRequestDto request) {
-		try {
-			UploadResponseDto response = sdsService.uploadSds(request);
-			return ResponseEntity.ok(response);
-		} catch (Exception e) {
-			logger.error("Error occurred while uploading SDS", e);
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-		} finally {
-			DatabaseContextHolder.clear();
-		}
+	    try {
+	        UploadResponseDto response = sdsService.uploadSds(request);
+	        // ✅ HANDLE DIFFERENT STATUSES
+	        if ("DUPLICATE".equalsIgnoreCase(response.getStatus())) {
+	            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+	        }
+	        if ("OCR_FAILED".equalsIgnoreCase(response.getStatus())) {
+	            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+	        }
+	        return ResponseEntity.ok(response);
+	    } catch (Exception e) {
+	        logger.error("Error occurred while uploading SDS", e);
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+	                .body(new UploadResponseDto());
+	    } finally {
+	        DatabaseContextHolder.clear();
+	    }
 	}
 
 	/* ================= Details API ================= */
@@ -190,4 +202,71 @@ public class SdsController implements SdsApi {
 			DatabaseContextHolder.clear();
 		}
 	}
+	
+	/* ================= Delete (Generic for Child Items) API (2) ================= */
+	@Override
+	public ResponseEntity<DeleteHazardChildResponseDto> deleteHazardChild(
+	         @PathVariable String type,
+	        @PathVariable Long id) {
+
+	    try {
+	        return ResponseEntity.ok(sdsService.deleteHazardChild(type, id));
+
+	    } catch (IllegalArgumentException e) {
+	        return ResponseEntity.badRequest()
+	                .body(DeleteHazardChildResponseDto.builder()
+	                        .status("FAILED")
+	                        .message(e.getMessage())
+	                        .build());
+
+	    } catch (RuntimeException e) {
+	        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+	                .body(DeleteHazardChildResponseDto.builder()
+	                        .status("FAILED")
+	                        .message(e.getMessage())
+	                        .build());
+
+	    } catch (Exception e) {
+	        logger.error("Delete error", e);
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+	                .body(DeleteHazardChildResponseDto.builder()
+	                        .status("ERROR")
+	                        .message("Something went wrong")
+	                        .build());
+	    } finally {
+	        DatabaseContextHolder.clear(); 
+	    }
+	}
+	
+	/* ================= Handle Hazard API ================= */
+	@Override
+	public ResponseEntity<HandleHazardOcrResponseDto> handleHazardOcr(
+	        @PathVariable Long sdsId,
+	        @RequestBody HandleHazardOcrRequestDto request) {
+	    try {
+	        HandleHazardOcrResponseDto response = sdsService.handleHazardOcr(sdsId, request);
+	        return ResponseEntity.ok(response);
+	    } catch (Exception e) {
+	        logger.error("Error occurred while processing Hazard OCR", e);
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+	    } finally {
+	        DatabaseContextHolder.clear();
+	    }
+    }
+	
+	/* ================= Master Hazard Data API ================= */
+	@Override
+	@GetMapping("/master/hazard-data")
+	public ResponseEntity<HazardMasterResponseDTO> getHazardMasterData() {
+	    try {
+	        HazardMasterResponseDTO response = sdsService.getHazardMasterData();
+	        return ResponseEntity.ok(response);
+	    } catch (Exception e) {
+	        logger.error("Error occurred while fetching Hazard Master Data", e);
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+	    } finally {
+	        DatabaseContextHolder.clear();
+	    }
+	}
+	
 }

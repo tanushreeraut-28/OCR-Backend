@@ -27,7 +27,6 @@ public class SdsOcrResult {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
-    
 
 	@Column(name = "user_id")
 	private Integer userId;
@@ -37,4 +36,7 @@ public class SdsOcrResult {
 	
 	@Column(name = "notes")
 	private String notes;
+	
+	@Column(name = "ocr_status")
+    private String ocrStatus;
 }
