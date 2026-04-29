@@ -1,6 +1,6 @@
 package com.clideOffice.clideApp.common.ocr_project.sds.repository;
 
-import com.clideOffice.clideApp.common.ocr_project.sds.entity.SdsSection1;
+import com.clideOffice.clideApp.common.ocr_project.sds.entity.section1.SdsSection1;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;

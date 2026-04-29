@@ -8,13 +8,15 @@ import org.springframework.stereotype.Repository;
 
 import jakarta.transaction.Transactional;
 
-import com.clideOffice.clideApp.common.ocr_project.sds.entity.SdsMaster;
+import com.clideOffice.clideApp.common.ocr_project.sds.entity.section1.SdsMaster;
 import com.clideOffice.clideApp.common.ocr_project.sds.interfaces.UploadProjection;
 
 @Repository
 public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
 
-    /* ================= DUPLICATE DETECTION (FINAL FIXED) ================= */
+    /* =====================================================
+       DUPLICATE DETECTION
+    ===================================================== */
     @Query(value = """
         SELECT 
             id AS sdsId,
@@ -29,7 +31,9 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("sdsNumber") String sdsNumber
     );
 
-    /* ================= INSERT SDS MASTER ================= */
+    /* =====================================================
+       SDS MASTER
+    ===================================================== */
     @Modifying
     @Transactional
     @Query(value = """
@@ -45,7 +49,6 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("createdBy") Long createdBy
     );
 
-    /* ================= GET SDS ID (FINAL FIXED) ================= */
     @Query(value = """
         SELECT id
         FROM sds_master
@@ -59,7 +62,9 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("sdsNumber") String sdsNumber
     );
 
-    /* ================= INSERT VERSION ================= */
+    /* =====================================================
+       VERSION
+    ===================================================== */
     @Modifying
     @Transactional
     @Query(value = """
@@ -76,7 +81,6 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("uploadedBy") Long uploadedBy
     );
 
-    /* ================= GET VERSION ID ================= */
     @Query(value = """
         SELECT id
         FROM sds_version
@@ -86,7 +90,9 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
         """, nativeQuery = true)
     Long getVersionId(@Param("sdsId") Long sdsId);
 
-    /* ================= INSERT SECTION 1 ================= */
+    /* =====================================================
+       SECTION 1
+    ===================================================== */
     @Modifying
     @Transactional
     @Query(value = """
@@ -109,7 +115,79 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("sourceType") String sourceType
     );
 
-    /* ================= SAVE OCR RESULT ================= */
+    /* =====================================================
+       SECTION 2 (HAZARD)
+    ===================================================== */
+    @Modifying
+    @Transactional
+    @Query(value = """
+        INSERT INTO sds_section2_hazard
+        (sds_id, version_id, hazard_classification, signal_word, other_hazards, source_type, created_at, is_master)
+        VALUES
+        (:sdsId, :versionId, :hazardClassification, :signalWord, :otherHazards, :sourceType, NOW(), TRUE)
+        """, nativeQuery = true)
+    void insertSection2(
+            @Param("sdsId") Long sdsId,
+            @Param("versionId") Long versionId,
+            @Param("hazardClassification") String hazardClassification,
+            @Param("signalWord") String signalWord,
+            @Param("otherHazards") String otherHazards,
+            @Param("sourceType") String sourceType
+    );
+
+    @Query(value = """
+        SELECT id
+        FROM sds_section2_hazard
+        WHERE sds_id = :sdsId
+        AND version_id = :versionId
+        ORDER BY id DESC
+        LIMIT 1
+        """, nativeQuery = true)
+    Long getSection2Id(
+            @Param("sdsId") Long sdsId,
+            @Param("versionId") Long versionId
+    );
+
+    /* =====================================================
+       SECTION 2 CHILD TABLES (FINAL FIXED)
+    ===================================================== */
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        INSERT INTO sds_hazard_statement (hazard_id, code, description, is_master)
+        VALUES (:hazardId, NULL, :text, TRUE)
+        """, nativeQuery = true)
+    void insertHazardStatements(
+            @Param("hazardId") Long hazardId,
+            @Param("text") String text
+    );
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        INSERT INTO sds_precautionary_statement (hazard_id, code, description, is_master)
+        VALUES (:hazardId, NULL, :text, TRUE)
+        """, nativeQuery = true)
+    void insertPrecautionaryStatements(
+            @Param("hazardId") Long hazardId,
+            @Param("text") String text
+    );
+
+    @Modifying
+    @Transactional
+    @Query(value = """
+        INSERT INTO sds_hazard_pictogram (hazard_id, image_url, code)
+        VALUES (:hazardId, :text, NULL)
+        """, nativeQuery = true)
+    void insertPictograms(
+            @Param("hazardId") Long hazardId,
+            @Param("text") String text
+    );
+
+    /* =====================================================
+       OCR RESULT
+    ===================================================== */
     @Modifying
     @Transactional
     @Query(value = """
@@ -125,7 +203,9 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("confidenceScore") Double confidenceScore
     );
 
-    /* ================= DUPLICATE LOG ================= */
+    /* =====================================================
+       DUPLICATE LOG
+    ===================================================== */
     @Modifying
     @Transactional
     @Query(value = """
@@ -140,7 +220,9 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
             @Param("actionTaken") String actionTaken
     );
 
-    /* ================= UPDATE TIMESTAMP ================= */
+    /* =====================================================
+       TIMESTAMP UPDATE
+    ===================================================== */
     @Modifying
     @Transactional
     @Query(value = """
@@ -150,7 +232,9 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
         """, nativeQuery = true)
     void updateTimestamp(@Param("sdsId") Long sdsId);
 
-    /* ================= AUDIT LOG ================= */
+    /* =====================================================
+       AUDIT LOG
+    ===================================================== */
     @Modifying
     @Transactional
     @Query(value = """

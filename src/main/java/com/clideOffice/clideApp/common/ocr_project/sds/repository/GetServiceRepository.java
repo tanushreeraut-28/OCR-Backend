@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import com.clideOffice.clideApp.common.ocr_project.sds.entity.Services;
+import com.clideOffice.clideApp.common.ocr_project.sds.entity.section1.Services;
 import com.clideOffice.clideApp.common.ocr_project.sds.interfaces.GetServiceProjection;
 
 @Repository

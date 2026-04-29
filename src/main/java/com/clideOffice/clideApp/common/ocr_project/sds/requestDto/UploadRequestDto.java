@@ -7,5 +7,6 @@ import org.springframework.web.multipart.MultipartFile;
 public class UploadRequestDto {
 
     private MultipartFile file;
+    private String sectionType;
 
 }

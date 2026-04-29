@@ -1,17 +1,20 @@
 package com.clideOffice.clideApp.common.ocr_project.sds.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import com.clideOffice.clideApp.common.ocr_project.sds.entity.SdsSection2Hazard;
+import com.clideOffice.clideApp.common.ocr_project.sds.entity.section2.SdsSection2Hazard;
 import com.clideOffice.clideApp.common.ocr_project.sds.interfaces.HazardMasterProjection;
 
 @Repository
 public interface HandleHazardOcrRepository extends JpaRepository<SdsSection2Hazard, Long> {
 
+	Optional<SdsSection2Hazard> findBySdsMaster_Id(Long sdsId);
+	
     @Query("""
         SELECT 
             h.hazardClassification AS hazardClassification,
