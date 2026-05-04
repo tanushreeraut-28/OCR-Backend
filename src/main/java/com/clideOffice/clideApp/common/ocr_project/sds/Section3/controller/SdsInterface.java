@@ -2,8 +2,10 @@ package com.clideOffice.clideApp.common.ocr_project.sds.Section3.controller;
 
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.SpecialLimitRequestDTO;
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UpdateIngredientRequestDTO;
+import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UploadRequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.IngredientResponseDTO;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.SpecialLimitResponseDTO;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.Upload3and4ResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -23,6 +25,18 @@ import java.util.Optional;
 public interface SdsInterface {
 
     default Optional<NativeWebRequest> getRequest() { return Optional.empty(); }
+
+    /* ================= SDS Upload API ================= */
+    @Operation(summary = "Upload SDS Section 3 & 4", description = "Upload SDS document for Section 3 and 4")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Upload Success"),
+            @ApiResponse(responseCode = "500", description = "Internal Server Error")
+    })
+    @PostMapping(value = "/upload-3-4",
+            consumes = "multipart/form-data",
+            produces = "application/json")
+    public ResponseEntity<Upload3and4ResponseDto> uploadSds(
+            @ModelAttribute UploadRequestDto request);
 
     /* ================= GET Ingredients by SDS ================= */
     @Operation(summary = "Get Ingredients by SDS ID", description = "Fetch all ingredients for a given SDS ID")

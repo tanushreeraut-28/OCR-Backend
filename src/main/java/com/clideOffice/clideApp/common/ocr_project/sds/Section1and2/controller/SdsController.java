@@ -42,7 +42,7 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 @RequiredArgsConstructor
 public class SdsController implements SdsApi {
 
-    	private static final Logger logger = LoggerFactory.getLogger(SdsController.class);
+    	public static final Logger logger = LoggerFactory.getLogger(SdsController.class);
 
     	private final SdsService sdsService;
 

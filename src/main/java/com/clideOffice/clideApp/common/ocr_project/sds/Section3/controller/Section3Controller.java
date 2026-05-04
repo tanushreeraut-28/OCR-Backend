@@ -3,8 +3,10 @@ package com.clideOffice.clideApp.common.ocr_project.sds.Section3.controller;
 import com.clideOffice.clideApp.common.ocr_project.sds.Section3.service.Section3Service;
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.SpecialLimitRequestDTO;
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UpdateIngredientRequestDTO;
+import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UploadRequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.IngredientResponseDTO;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.SpecialLimitResponseDTO;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.Upload3and4ResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.util.DatabaseContextHolder;
 
 import lombok.RequiredArgsConstructor;
@@ -17,12 +19,46 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+import static com.clideOffice.clideApp.common.ocr_project.sds.Section1and2.controller.SdsController.logger;
+
 @RestController
 @RequiredArgsConstructor
 @Slf4j
 public class Section3Controller implements SdsInterface {
 
     private final Section3Service section3Service;
+
+    /* ================= SDS Upload API ================= */
+    @Override
+    public ResponseEntity<Upload3and4ResponseDto> uploadSds(UploadRequestDto request) {
+        try {
+            Upload3and4ResponseDto response = section3Service.uploadSection3and4(request);
+
+            // ✅ HANDLE DIFFERENT STATUSES
+            if ("DUPLICATE".equalsIgnoreCase(response.getStatus())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            if ("OCR_FAILED".equalsIgnoreCase(response.getStatus())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            logger.error("Error occurred while uploading SDS Section 3 & 4", e);
+
+            Upload3and4ResponseDto error = new Upload3and4ResponseDto();
+            error.setStatus("FAILED");
+            error.setMessage(e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(error);
+
+        } finally {
+            DatabaseContextHolder.clear();
+        }
+    }
 
     /* ================= GET Ingredients by SDS ================= */
     @Override

@@ -106,7 +106,7 @@ public class SdsServiceImpl implements SdsService {
     private final HazardPictogramRepository hazardPictogramRepository;
     private final HandleHazardOcrRepository hazardRepository;
     private final SdsOcrResultRepository ocrRepository;
-    
+
     private final AmazonS3 amazonS3;
 
     @Value("${amazon.url}")
@@ -127,7 +127,7 @@ public class SdsServiceImpl implements SdsService {
     // Used In HandleHazardOcr API
     private static final String PREVIEW = "preview";
     private static final String CONFIRM = "confirm";
-    
+
     // Upload API
     @Override
     public UploadResponseDto uploadSds(UploadRequestDto request) {
@@ -296,7 +296,7 @@ public class SdsServiceImpl implements SdsService {
             throw new RuntimeException("Upload failed: " + e.getMessage());
         }
     }
-//    @Override
+    //    @Override
 //    public UploadResponseDto uploadSds(UploadRequestDto request) {
 //
 //        UploadResponseDto response = new UploadResponseDto();
@@ -444,7 +444,7 @@ public class SdsServiceImpl implements SdsService {
 //            throw new RuntimeException("Upload failed: " + e.getMessage());
 //        }
 //    }
-//    
+//
     // UpdateSection1 API
     @Transactional
     public UpdateSection1ResponseDto updateSection1(Long sdsId, UpdateSection1RequestDto request) {
@@ -503,7 +503,7 @@ public class SdsServiceImpl implements SdsService {
 
         return response;
     }
-    
+
     // RemoveUser API
     @Override
     public RemoveUserResponseDto removeUser(Integer userId) {
@@ -520,53 +520,53 @@ public class SdsServiceImpl implements SdsService {
 
         return response;
     }
-    
+
     //OCRExtractedData API
     @Override
-	public OcrExtractedDataResponseDto getOcrExtractedData(Long sdsId) {
+    public OcrExtractedDataResponseDto getOcrExtractedData(Long sdsId) {
 
-		OcrExtractedDataProjection data = repository.getOcrExtractedData(sdsId);
+        OcrExtractedDataProjection data = repository.getOcrExtractedData(sdsId);
 
-		if (data == null) {
-			return OcrExtractedDataResponseDto.builder().message("OCR data not found").build();
-		}
+        if (data == null) {
+            return OcrExtractedDataResponseDto.builder().message("OCR data not found").build();
+        }
 
-		String rawText = data.getRawText();
+        String rawText = data.getRawText();
 
-		// helper function
-		String sdsNumber = data.getSdsNumber();
-		if (sdsNumber == null) {
-			sdsNumber = extractValue(rawText, "SDS Number");
-		}
+        // helper function
+        String sdsNumber = data.getSdsNumber();
+        if (sdsNumber == null) {
+            sdsNumber = extractValue(rawText, "SDS Number");
+        }
 
-		String use = data.getRecommendedUse();
-		if (use == null) {
-			use = extractValue(rawText, "Recommended Use");
-		}
+        String use = data.getRecommendedUse();
+        if (use == null) {
+            use = extractValue(rawText, "Recommended Use");
+        }
 
-		String restriction = data.getRecommendedRestrictions();
-		if (restriction == null) {
-			restriction = extractValue(rawText, "Restriction");
-		}
+        String restriction = data.getRecommendedRestrictions();
+        if (restriction == null) {
+            restriction = extractValue(rawText, "Restriction");
+        }
 
-		String manufacturer = data.getManufacturerInfo();
-		if (manufacturer == null) {
-			manufacturer = extractValue(rawText, "Manufacturer");
-		}
+        String manufacturer = data.getManufacturerInfo();
+        if (manufacturer == null) {
+            manufacturer = extractValue(rawText, "Manufacturer");
+        }
 
-		String otherName = data.getOtherIdentification();
-		if (otherName == null) {
-			otherName = extractValue(rawText, "Other Identification");
-		}
+        String otherName = data.getOtherIdentification();
+        if (otherName == null) {
+            otherName = extractValue(rawText, "Other Identification");
+        }
 
-		return OcrExtractedDataResponseDto.builder().sdsId(data.getSdsId()).versionId(data.getVersionId())
+        return OcrExtractedDataResponseDto.builder().sdsId(data.getSdsId()).versionId(data.getVersionId())
 
-				.product(data.getProductIdentifier()).otherName(otherName).sdsNumber(sdsNumber).use(use)
-				.restriction(restriction).manufacturer(manufacturer)
+                .product(data.getProductIdentifier()).otherName(otherName).sdsNumber(sdsNumber).use(use)
+                .restriction(restriction).manufacturer(manufacturer)
 
-				.sourceType(data.getSourceType()).message("OCR extracted data fetched successfully").build();
-	}
-    
+                .sourceType(data.getSourceType()).message("OCR extracted data fetched successfully").build();
+    }
+
     //GetService API
     @Override
     public List<GetServiceResponseDto> getAllServices() {
@@ -581,8 +581,8 @@ public class SdsServiceImpl implements SdsService {
                         .build())
                 .collect(Collectors.toList());
     }
-    
-    
+
+
     // Get Plant API
     @Override
     public List<GetPlantResponseDto> getPlantsByService(Long serviceId) {
@@ -597,8 +597,8 @@ public class SdsServiceImpl implements SdsService {
                 ))
                 .collect(Collectors.toList());
     }
-    
-    
+
+
     // Details API
     @Override
     public DetailsResponseDto getSdsDetails(Long sdsId) {
@@ -633,7 +633,7 @@ public class SdsServiceImpl implements SdsService {
 
         return response;
     }
-    
+
     // DashBoaredSummary API
     @Override
     public DashboardSummaryResponseDto getDashboardSummary() {
@@ -647,7 +647,7 @@ public class SdsServiceImpl implements SdsService {
                 .duplicates(projection.getDuplicates())
                 .build();
     }
-    
+
     // CreateVersion API
     @Override
     @Transactional
@@ -706,7 +706,7 @@ public class SdsServiceImpl implements SdsService {
             throw new RuntimeException("File upload failed", e);
         }
     }
-    
+
     // ConfirmOCR API
     @Override
     public ConfirmOCRResponseDto confirmOCR(Long sdsId) {
@@ -731,7 +731,7 @@ public class SdsServiceImpl implements SdsService {
                 .message("OCR confirmed successfully")
                 .build();
     }
-    
+
     // DeleteHazardChild API (Section 2)
     @Override
     public DeleteHazardChildResponseDto deleteHazardChild(String type, Long id) {
@@ -768,7 +768,7 @@ public class SdsServiceImpl implements SdsService {
             default -> throw new IllegalArgumentException("Invalid type");
         };
     }
-    
+
     // HandleHazardOcr API (Section 2)
     @Override
     public HandleHazardOcrResponseDto handleHazardOcr(Long sdsId, HandleHazardOcrRequestDto request) {
@@ -918,7 +918,7 @@ public class SdsServiceImpl implements SdsService {
                 .precautionaryStatements(precautionaryStatements)
                 .build();
     }
-    
+
     // OCR Extracted Data (Section 2)
     @Override
     public OcrExtractedDataSection2ResponseDto getOcrExtractedDataSection2(Long sdsId) {
@@ -955,13 +955,13 @@ public class SdsServiceImpl implements SdsService {
         // =========================
         String hazardStatements = hazard.getHazardStatements() != null
                 ? hazard.getHazardStatements().stream()
-                    .map(h ->
-                            (h.getCode() != null ? h.getCode() : "") +
-                            (h.getDescription() != null ? ": " + h.getDescription() : "")
-                    )
-                    .filter(s -> !s.isBlank())
-                    .reduce((a, b) -> a + "\n" + b)
-                    .orElse(null)
+                .map(h ->
+                        (h.getCode() != null ? h.getCode() : "") +
+                                (h.getDescription() != null ? ": " + h.getDescription() : "")
+                )
+                .filter(s -> !s.isBlank())
+                .reduce((a, b) -> a + "\n" + b)
+                .orElse(null)
                 : null;
 
         // =========================
@@ -969,14 +969,14 @@ public class SdsServiceImpl implements SdsService {
         // =========================
         String precautionaryStatements = hazard.getPrecautionaryStatements() != null
                 ? hazard.getPrecautionaryStatements().stream()
-                    .map(p ->
-                            (p.getCode() != null ? p.getCode() : "") +
-                            (p.getDescription() != null ? ": " + p.getDescription() : "")
-                    )
-                    .filter(s -> !s.isBlank())
-                    .map(s -> s.replaceAll("Pictogram.*", "").trim()) // 🔥 remove noise
-                    .reduce((a, b) -> a + "\n" + b)
-                    .orElse(null)
+                .map(p ->
+                        (p.getCode() != null ? p.getCode() : "") +
+                                (p.getDescription() != null ? ": " + p.getDescription() : "")
+                )
+                .filter(s -> !s.isBlank())
+                .map(s -> s.replaceAll("Pictogram.*", "").trim()) // 🔥 remove noise
+                .reduce((a, b) -> a + "\n" + b)
+                .orElse(null)
                 : null;
 
         // =========================
@@ -1028,9 +1028,9 @@ public class SdsServiceImpl implements SdsService {
                 .message("Section 2 data fetched from DB successfully")
                 .build();
     }
-    
+
     // Helper Code
- // ✅ Validate file type
+    // ✅ Validate file type
     private void validateFileType(MultipartFile file){
         String name = file.getOriginalFilename();
         if(name == null) throw new RuntimeException("Invalid file name");
@@ -1091,18 +1091,18 @@ public class SdsServiceImpl implements SdsService {
     private String cleanOcrText(String text){
         if(text == null) return "";
         return text.replaceAll("[^\\x00-\\x7F]", " ")
-                   .replaceAll("[*]", "")
-                   .replaceAll("\\s+", " ")
-                   .trim();
+                .replaceAll("[*]", "")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     // ✅ Normalize for duplicate check
     private String normalizeText(String text){
         if(text == null) return null;
         return text.toLowerCase()
-                   .replaceAll("[^a-z0-9 ]", "")
-                   .replaceAll("\\s+", " ")
-                   .trim();
+                .replaceAll("[^a-z0-9 ]", "")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     // ✅ Extract Product Identifier (FIXED)
@@ -1168,278 +1168,278 @@ public class SdsServiceImpl implements SdsService {
     }
 
     // regex extractor (OCRExtractedData API)
- 	private String extractValue(String text, String label) {
-
- 		if (text == null)
- 			return null;
-
- 		Pattern pattern = Pattern.compile(label + ":\\s*([^\\n]+)", Pattern.CASE_INSENSITIVE);
- 		Matcher matcher = pattern.matcher(text);
-
- 		return matcher.find() ? matcher.group(1).trim() : null;
- 	}
- 	
- 	
- // ================= SECTION 2 Helper Code =================
-
- 	// Section extractor
- 	private void handleSection2(String text, Long sdsId, Long versionId) {
-
- 	    // =========================
- 	    // ✅ FIX 1: SAFE SECTION EXTRACTION
- 	    // =========================
- 	    String section2Text = extractSection(text, "Section 2");
-
- 	    if (section2Text == null || section2Text.isBlank()) {
- 	        // 🔥 fallback → use full text
- 	        section2Text = text;
- 	    }
-
- 	    // =========================
- 	    // ✅ EXTRACT VALUES
- 	    // =========================
- 	    String hazardClassification = extractMultiLineValue(section2Text, "Classification");
- 	    String signalWord = extractValue(section2Text, "Signal Word");
- 	    String otherHazards = extractValue(section2Text, "Other Hazards");
-
- 	    String hazardStatementsRaw = extractMultiLineValue(section2Text, "Hazard Statements");
- 	    String precautionaryRaw = extractMultiLineValue(section2Text, "Precautionary Statements");
-
- 	    String pictogramCodes = extractPictogramCodes(section2Text);
-
- 	    // =========================
- 	    // 🔥 FIX 2: CLEAN DATA BEFORE SAVE
- 	    // =========================
- 	    if (hazardClassification != null) {
- 	        hazardClassification = hazardClassification
- 	                .split("Signal Word|Hazard Statements|Precautionary Statements")[0]
- 	                .trim();
+    private String extractValue(String text, String label) {
+
+        if (text == null)
+            return null;
 
- 	        if (hazardClassification.length() > 255) {
- 	            hazardClassification = hazardClassification.substring(0, 255);
- 	        }
- 	    }
+        Pattern pattern = Pattern.compile(label + ":\\s*([^\\n]+)", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(text);
 
- 	    if (signalWord != null) {
- 	        signalWord = signalWord
- 	                .split("Hazard Statements|Precautionary Statements")[0]
- 	                .trim();
+        return matcher.find() ? matcher.group(1).trim() : null;
+    }
 
- 	        if (signalWord.length() > 50) {
- 	            signalWord = signalWord.substring(0, 50);
- 	        }
- 	    }
-
- 	    if (otherHazards != null && otherHazards.length() > 255) {
- 	        otherHazards = otherHazards.substring(0, 255);
- 	    }
-
- 	    // =========================
- 	    // 🔥 FIX 3: DEFAULT FALLBACKS (IMPORTANT)
- 	    // =========================
- 	    if (hazardClassification == null || hazardClassification.isBlank()) {
- 	        hazardClassification = "Not Available";
- 	    }
 
- 	    if (signalWord == null || signalWord.isBlank()) {
- 	        signalWord = "UNKNOWN";
- 	    }
+    // ================= SECTION 2 Helper Code =================
 
- 	    // =========================
- 	    // ✅ CREATE MAIN ENTITY
- 	    // =========================
- 	    SdsSection2Hazard hazard = new SdsSection2Hazard();
-
- 	    hazard.setSdsMaster(new SdsMaster(sdsId));
- 	    hazard.setVersion(new SdsVersion(versionId));
-
- 	    hazard.setHazardClassification(hazardClassification);
- 	    hazard.setSignalWord(signalWord);
- 	    hazard.setOtherHazards(otherHazards);
- 	    hazard.setSourceType("OCR");
- 	    hazard.setCreatedAt(java.time.LocalDateTime.now());
- 	    hazard.setIsMaster(false);
-
- 	    // ✅ SAVE MAIN ENTITY
- 	    hazard = hazardRepository.save(hazard);
-
- 	    // =========================
- 	    // ✅ Hazard Statements
- 	    // =========================
- 	    if (hazardStatementsRaw != null) {
-
- 	        String[] lines = hazardStatementsRaw.split("\\n");
+    // Section extractor
+    private void handleSection2(String text, Long sdsId, Long versionId) {
 
- 	        for (String line : lines) {
+        // =========================
+        // ✅ FIX 1: SAFE SECTION EXTRACTION
+        // =========================
+        String section2Text = extractSection(text, "Section 2");
 
- 	            line = line.trim();
+        if (section2Text == null || section2Text.isBlank()) {
+            // 🔥 fallback → use full text
+            section2Text = text;
+        }
 
- 	            if (line.isEmpty() || line.toLowerCase().contains("precautionary"))
- 	                continue;
+        // =========================
+        // ✅ EXTRACT VALUES
+        // =========================
+        String hazardClassification = extractMultiLineValue(section2Text, "Classification");
+        String signalWord = extractValue(section2Text, "Signal Word");
+        String otherHazards = extractValue(section2Text, "Other Hazards");
 
- 	            Matcher m = Pattern.compile("(H\\d{3})\\s*[-:]\\s*(.*)").matcher(line);
+        String hazardStatementsRaw = extractMultiLineValue(section2Text, "Hazard Statements");
+        String precautionaryRaw = extractMultiLineValue(section2Text, "Precautionary Statements");
 
- 	            HazardStatement hs = new HazardStatement();
- 	            hs.setHazard(hazard);
+        String pictogramCodes = extractPictogramCodes(section2Text);
 
- 	            if (m.find()) {
- 	                hs.setCode(m.group(1));
- 	                hs.setDescription(m.group(2));
- 	            } else {
- 	                hs.setDescription(line);
- 	            }
+        // =========================
+        // 🔥 FIX 2: CLEAN DATA BEFORE SAVE
+        // =========================
+        if (hazardClassification != null) {
+            hazardClassification = hazardClassification
+                    .split("Signal Word|Hazard Statements|Precautionary Statements")[0]
+                    .trim();
 
- 	            hs.setIsMaster(false);
- 	            hazardStatementRepository.save(hs);
- 	        }
- 	    }
+            if (hazardClassification.length() > 255) {
+                hazardClassification = hazardClassification.substring(0, 255);
+            }
+        }
 
- 	    // =========================
- 	    // ✅ Precautionary Statements
- 	    // =========================
- 	    if (precautionaryRaw != null) {
+        if (signalWord != null) {
+            signalWord = signalWord
+                    .split("Hazard Statements|Precautionary Statements")[0]
+                    .trim();
 
- 	        String[] lines = precautionaryRaw.split("\\n");
+            if (signalWord.length() > 50) {
+                signalWord = signalWord.substring(0, 50);
+            }
+        }
 
- 	        for (String line : lines) {
+        if (otherHazards != null && otherHazards.length() > 255) {
+            otherHazards = otherHazards.substring(0, 255);
+        }
 
- 	            line = line.trim();
+        // =========================
+        // 🔥 FIX 3: DEFAULT FALLBACKS (IMPORTANT)
+        // =========================
+        if (hazardClassification == null || hazardClassification.isBlank()) {
+            hazardClassification = "Not Available";
+        }
 
- 	            if (line.isEmpty())
- 	                continue;
+        if (signalWord == null || signalWord.isBlank()) {
+            signalWord = "UNKNOWN";
+        }
 
- 	            // 🔥 remove OCR garbage
- 	            line = line.replaceAll("Pictogram.*", "").trim();
+        // =========================
+        // ✅ CREATE MAIN ENTITY
+        // =========================
+        SdsSection2Hazard hazard = new SdsSection2Hazard();
 
- 	            Matcher m = Pattern.compile("(P\\d+(\\+P\\d+)*)\\s*[-:]\\s*(.*)").matcher(line);
+        hazard.setSdsMaster(new SdsMaster(sdsId));
+        hazard.setVersion(new SdsVersion(versionId));
 
- 	            PrecautionaryStatement ps = new PrecautionaryStatement();
- 	            ps.setHazard(hazard);
+        hazard.setHazardClassification(hazardClassification);
+        hazard.setSignalWord(signalWord);
+        hazard.setOtherHazards(otherHazards);
+        hazard.setSourceType("OCR");
+        hazard.setCreatedAt(java.time.LocalDateTime.now());
+        hazard.setIsMaster(false);
 
- 	            if (m.find()) {
- 	                ps.setCode(m.group(1));
- 	                ps.setDescription(m.group(3));
- 	            } else {
- 	                ps.setDescription(line);
- 	            }
+        // ✅ SAVE MAIN ENTITY
+        hazard = hazardRepository.save(hazard);
 
- 	            ps.setIsMaster(false);
- 	            precautionaryStatementRepository.save(ps);
- 	        }
- 	    }
+        // =========================
+        // ✅ Hazard Statements
+        // =========================
+        if (hazardStatementsRaw != null) {
 
- 	    // =========================
- 	    // ✅ Pictograms
- 	    // =========================
- 	    if (pictogramCodes != null && !pictogramCodes.isBlank()) {
+            String[] lines = hazardStatementsRaw.split("\\n");
 
- 	        for (String code : pictogramCodes.split(",")) {
+            for (String line : lines) {
 
- 	            if (code == null || code.isBlank()) continue;
+                line = line.trim();
 
- 	            HazardPictogram pic = new HazardPictogram();
- 	            pic.setHazard(hazard);
- 	            pic.setCode(code.trim());
+                if (line.isEmpty() || line.toLowerCase().contains("precautionary"))
+                    continue;
 
- 	            hazardPictogramRepository.save(pic);
- 	        }
- 	    }
- 	}
- 	
-	 // detectSectionType
-	 private String detectSectionType(String text) {
-		    if (text == null) return "UNKNOWN";
-		    text = text.toLowerCase();
+                Matcher m = Pattern.compile("(H\\d{3})\\s*[-:]\\s*(.*)").matcher(line);
 
-		    // ✅ detect section 2 properly
-		    if (text.contains("section 2") || text.contains("hazard identification")) {
-		        return "SECTION_2";
-		    }
-		    if (text.contains("section 1") || text.contains("identification")) {
-		        return "SECTION_1";
-		    }
-		    return "UNKNOWN";
-		}
-	 
-	 // Multi-line Extractor  (OCRExtractedData API Section 2)
-	 private String extractMultiLineValue(String text, String label) {
+                HazardStatement hs = new HazardStatement();
+                hs.setHazard(hazard);
 
-		    if (text == null) return null;
+                if (m.find()) {
+                    hs.setCode(m.group(1));
+                    hs.setDescription(m.group(2));
+                } else {
+                    hs.setDescription(line);
+                }
 
-		    Pattern pattern;
+                hs.setIsMaster(false);
+                hazardStatementRepository.save(hs);
+            }
+        }
 
-		    if (label.equalsIgnoreCase("Hazard Statements")) {
+        // =========================
+        // ✅ Precautionary Statements
+        // =========================
+        if (precautionaryRaw != null) {
 
-		        pattern = Pattern.compile(
-		                "Hazard Statements\\s*:?\\s*([\\s\\S]*?)(?=Precautionary Statements|Pictogram|$)",
-		                Pattern.CASE_INSENSITIVE
-		        );
+            String[] lines = precautionaryRaw.split("\\n");
 
-		    } else if (label.equalsIgnoreCase("Precautionary Statements")) {
+            for (String line : lines) {
 
-		        pattern = Pattern.compile(
-		                "Precautionary Statements\\s*:?\\s*([\\s\\S]*?)(?=Pictogram|$)",
-		                Pattern.CASE_INSENSITIVE
-		        );
+                line = line.trim();
 
-		    } else if (label.equalsIgnoreCase("Classification")) {
+                if (line.isEmpty())
+                    continue;
 
-		        pattern = Pattern.compile(
-		                "Classification\\s*:?\\s*([\\s\\S]*?)(?=Signal Word|Hazard Statements|$)",
-		                Pattern.CASE_INSENSITIVE
-		        );
+                // 🔥 remove OCR garbage
+                line = line.replaceAll("Pictogram.*", "").trim();
 
-		    } else {
-		        pattern = Pattern.compile(label + "\\s*:\\s*(.*)", Pattern.CASE_INSENSITIVE);
-		    }
+                Matcher m = Pattern.compile("(P\\d+(\\+P\\d+)*)\\s*[-:]\\s*(.*)").matcher(line);
 
-		    Matcher matcher = pattern.matcher(text);
+                PrecautionaryStatement ps = new PrecautionaryStatement();
+                ps.setHazard(hazard);
 
-		    if (matcher.find()) {
-		        return matcher.group(1).trim();
-		    }
+                if (m.find()) {
+                    ps.setCode(m.group(1));
+                    ps.setDescription(m.group(3));
+                } else {
+                    ps.setDescription(line);
+                }
 
-		    return null;
-		}
-	 
-	 // Pictogram Extractor (OCRExtractedData API Section 2)
-	 private String extractPictogramCodes(String text) {
+                ps.setIsMaster(false);
+                precautionaryStatementRepository.save(ps);
+            }
+        }
 
-		    if (text == null) return null;
+        // =========================
+        // ✅ Pictograms
+        // =========================
+        if (pictogramCodes != null && !pictogramCodes.isBlank()) {
 
-		    Pattern pattern = Pattern.compile("GHS\\d{2}");
-		    Matcher matcher = pattern.matcher(text);
+            for (String code : pictogramCodes.split(",")) {
 
-		    Set<String> codes = new LinkedHashSet<>();
+                if (code == null || code.isBlank()) continue;
 
-		    while (matcher.find()) {
-		        codes.add(matcher.group());
-		    }
+                HazardPictogram pic = new HazardPictogram();
+                pic.setHazard(hazard);
+                pic.setCode(code.trim());
 
-		    return String.join(",", codes);
-		}
+                hazardPictogramRepository.save(pic);
+            }
+        }
+    }
 
-	 // Section Extractor (OCRExtractedData API Section 2)
-	 private String extractSection(String text, String sectionName) {
+    // detectSectionType
+    private String detectSectionType(String text) {
+        if (text == null) return "UNKNOWN";
+        text = text.toLowerCase();
 
-		    if (text == null) return null;
+        // ✅ detect section 2 properly
+        if (text.contains("section 2") || text.contains("hazard identification")) {
+            return "SECTION_2";
+        }
+        if (text.contains("section 1") || text.contains("identification")) {
+            return "SECTION_1";
+        }
+        return "UNKNOWN";
+    }
 
-		    Pattern pattern = Pattern.compile(
-		            "(?i)(section\\s*2[\\s\\S]*?)(section\\s*3|$)",
-		            Pattern.DOTALL
-		    );
+    // Multi-line Extractor  (OCRExtractedData API Section 2)
+    private String extractMultiLineValue(String text, String label) {
 
-		    Matcher matcher = pattern.matcher(text);
+        if (text == null) return null;
 
-		    if (matcher.find()) {
-		        return matcher.group(1).trim();
-		    }
+        Pattern pattern;
 
-		    // 🔥 FALLBACK (VERY IMPORTANT)
-		    if (text.toLowerCase().contains("section 2")) {
-		        return text; // return full text if section not isolated
-		    }
+        if (label.equalsIgnoreCase("Hazard Statements")) {
 
-		    return null;
-		}
+            pattern = Pattern.compile(
+                    "Hazard Statements\\s*:?\\s*([\\s\\S]*?)(?=Precautionary Statements|Pictogram|$)",
+                    Pattern.CASE_INSENSITIVE
+            );
+
+        } else if (label.equalsIgnoreCase("Precautionary Statements")) {
+
+            pattern = Pattern.compile(
+                    "Precautionary Statements\\s*:?\\s*([\\s\\S]*?)(?=Pictogram|$)",
+                    Pattern.CASE_INSENSITIVE
+            );
+
+        } else if (label.equalsIgnoreCase("Classification")) {
+
+            pattern = Pattern.compile(
+                    "Classification\\s*:?\\s*([\\s\\S]*?)(?=Signal Word|Hazard Statements|$)",
+                    Pattern.CASE_INSENSITIVE
+            );
+
+        } else {
+            pattern = Pattern.compile(label + "\\s*:\\s*(.*)", Pattern.CASE_INSENSITIVE);
+        }
+
+        Matcher matcher = pattern.matcher(text);
+
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+
+        return null;
+    }
+
+    // Pictogram Extractor (OCRExtractedData API Section 2)
+    private String extractPictogramCodes(String text) {
+
+        if (text == null) return null;
+
+        Pattern pattern = Pattern.compile("GHS\\d{2}");
+        Matcher matcher = pattern.matcher(text);
+
+        Set<String> codes = new LinkedHashSet<>();
+
+        while (matcher.find()) {
+            codes.add(matcher.group());
+        }
+
+        return String.join(",", codes);
+    }
+
+    // Section Extractor (OCRExtractedData API Section 2)
+    private String extractSection(String text, String sectionName) {
+
+        if (text == null) return null;
+
+        Pattern pattern = Pattern.compile(
+                "(?i)(section\\s*2[\\s\\S]*?)(section\\s*3|$)",
+                Pattern.DOTALL
+        );
+
+        Matcher matcher = pattern.matcher(text);
+
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+
+        // 🔥 FALLBACK (VERY IMPORTANT)
+        if (text.toLowerCase().contains("section 2")) {
+            return text; // return full text if section not isolated
+        }
+
+        return null;
+    }
 }
