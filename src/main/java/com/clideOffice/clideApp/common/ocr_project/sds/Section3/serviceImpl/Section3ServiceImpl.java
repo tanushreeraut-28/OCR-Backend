@@ -20,6 +20,7 @@ import net.sourceforge.tess4j.Tesseract;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -254,19 +255,30 @@ public class Section3ServiceImpl implements Section3Service {
         List<String[]> list = new ArrayList<>();
         if (text == null || text.isEmpty()) return list;
 
+        // ✅ MORE FLEXIBLE PATTERN
         Pattern pattern = Pattern.compile(
-                "([A-Za-z\\s\\-]+)\\s+(\\d{2,7}-\\d{2}-\\d).*?(\\d+%|\\d+\\.\\d+%)?.*?(H\\d{3}.*?)",
+                "([A-Za-z\\s\\-]+?)\\s+(\\d{2,7}[-\\s]?\\d{2}[-\\s]?\\d).*?(H\\d{3})?",
                 Pattern.CASE_INSENSITIVE
         );
 
         Matcher m = pattern.matcher(text);
 
         while (m.find()) {
+
+            String chemical = safe(m.group(1));
+            String cas = safe(m.group(2));
+            String classification = safe(m.group(3));
+
+            // 🔥 CLEAN CAS FORMAT
+            if (cas != null) {
+                cas = cas.replaceAll("\\s+", "-");
+            }
+
             list.add(new String[]{
-                    safe(m.group(1)), // chemical_name
-                    safe(m.group(2)), // cas_number
-                    safe(m.group(3)), // concentration
-                    safe(m.group(4))  // classification
+                    chemical,
+                    cas,
+                    null,          // ec_number
+                    classification
             });
         }
 
@@ -491,102 +503,3 @@ public class Section3ServiceImpl implements Section3Service {
 
 
 
-//package com.clideOffice.clideApp.common.ocr_project.sds.Section3.serviceImpl;
-//
-//import com.amazonaws.services.s3.AmazonS3;
-//import com.amazonaws.services.s3.model.ObjectMetadata;
-//import com.amazonaws.services.s3.model.PutObjectRequest;
-//import com.clideOffice.clideApp.common.ocr_project.sds.Section3.service.Section3Service;
-//import com.clideOffice.clideApp.common.ocr_project.sds.entity.section3.Ingredient;
-//import com.clideOffice.clideApp.common.ocr_project.sds.entity.section3.SpecialLimit;
-//import com.clideOffice.clideApp.common.ocr_project.sds.interfaces.UploadProjection3and4;
-//import com.clideOffice.clideApp.common.ocr_project.sds.repository.IngredientRepository;
-//import com.clideOffice.clideApp.common.ocr_project.sds.repository.SpecialLimitRepository;
-//import com.clideOffice.clideApp.common.ocr_project.sds.repository.UploadRepository3and4;
-//import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.*;
-//import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.IngredientResponseDTO;
-//
-//import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.SpecialLimitResponseDTO;
-//import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.Upload3and4ResponseDto;
-//import lombok.RequiredArgsConstructor;
-//
-//import net.sourceforge.tess4j.Tesseract;
-//import org.apache.pdfbox.pdmodel.PDDocument;
-//import org.apache.pdfbox.rendering.PDFRenderer;
-//import org.springframework.beans.factory.annotation.Value;
-//import org.springframework.stereotype.Service;
-//import org.springframework.web.multipart.MultipartFile;
-//
-//import javax.imageio.ImageIO;
-//import java.awt.image.BufferedImage;
-//import java.io.ByteArrayInputStream;
-//import java.io.File;
-//import java.util.ArrayList;
-//import java.util.List;
-//import java.util.regex.Matcher;
-//import java.util.regex.Pattern;
-//import java.util.stream.Collectors;
-//
-//@Service
-//@RequiredArgsConstructor
-//public class Section3ServiceImpl implements Section3Service {
-//
-//    private final IngredientRepository ingredientRepository;
-//    private final SpecialLimitRepository specialLimitRepository;
-//    private final UploadRepository3and4 repository;
-//
-//    private final AmazonS3 amazonS3;
-//
-//    @Value("${amazon.url}")
-//    private String amazonUrl;
-//
-//    @Value("${aws.s3.bucket.qaclide}")
-//    private String bucketName;
-//
-//    @Value("${tesseract.datapath}")
-//    private String tessDataPath;
-//
-//    private static final List<String> ALLOWED_TYPES = List.of(
-//            "pdf", "doc", "docx", "txt",
-//            "jpg", "jpeg", "png", "bmp",
-//            "tiff", "tif", "gif", "webp"
-//    );
-//
-//    // Upload
-//    @Override
-//    public Upload3and4ResponseDto uploadSection3and4(UploadRequestDto request) {
-//
-//        Upload3and4ResponseDto response = new Upload3and4ResponseDto();
-//
-//        try {
-//            MultipartFile file = request.getFile();
-//
-//            if (file == null || file.isEmpty()) {
-//                throw new RuntimeException("File is empty");
-//            }
-//
-//            // ================= CREATE FOLDER =================
-//            String uploadDir = System.getProperty("user.dir") + File.separator + "uploads";
-//            File folder = new File(uploadDir);
-//
-//            if (!folder.exists()) {
-//                boolean created = folder.mkdirs();
-//                if (!created) {
-//                    throw new RuntimeException("Failed to create upload directory");
-//                }
-//            }
-//
-//            // ================= FILE NAME =================
-//            String originalFileName = file.getOriginalFilename();
-//            if (originalFileName == null) {
-//                throw new RuntimeException("Invalid file name");
-//            }
-//
-//            // ================= DUPLICATE CHECK =================
-//            File savedFile = new File(folder, originalFileName);
-//
-//            if (savedFile.exists()) {
-//                response.setStatus("FAILED");
-//                response.setMessage("Duplicate file: already uploaded");
-//                return response;
-//            }
