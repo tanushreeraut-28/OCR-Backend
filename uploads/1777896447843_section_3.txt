@@ -1,6 +1,0 @@
-SECTION 3: Composition / Information on Ingredients
-
-Substance Name CAS Number Concentration Classification Acetone 67-64-1
-40% H225 Ethanol 64-17-5 30% H319 Isopropanol 67-63-0 20% H336
-
-Special Limits: Acetone 50% Ethanol 60%
