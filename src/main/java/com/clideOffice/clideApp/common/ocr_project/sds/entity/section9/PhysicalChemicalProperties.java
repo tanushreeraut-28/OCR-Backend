@@ -17,8 +17,6 @@ public class PhysicalChemicalProperties {
 
     private Long sdsId;
 
-    // 🔹 9.1 Basic Physical Properties
-
     private String physicalState;
     private String colour;
     private String odour;
@@ -34,8 +32,6 @@ public class PhysicalChemicalProperties {
     private String solubility;
     private String partitionCoefficient;
 
-    // 🔹 Additional Physical & Chemical Properties
-
     private String vapourPressure;
     private String density;
     private String relativeVapourDensity;
@@ -49,7 +45,21 @@ public class PhysicalChemicalProperties {
     private String moisture;
     private String vocContent;
 
-    // 🔹 9.2 Other Information
     @Column(columnDefinition = "TEXT")
     private String otherInformation;
+
+    // ================= FILE STORAGE =================
+
+    @Lob
+    @Column(columnDefinition = "LONGBLOB")
+    private byte[] fileData;
+
+    private String fileName;
+
+    private String fileType;
+
+    @Column(unique = true)
+    private String fileHash;
+
+    private Boolean isActive = true;
 }

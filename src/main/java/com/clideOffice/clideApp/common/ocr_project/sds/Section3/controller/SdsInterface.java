@@ -28,36 +28,21 @@ public interface SdsInterface {
 
     /* ================= SDS Upload API ================= */
     @Operation(summary = "Upload SDS Section 3 & 4", description = "Upload SDS document for Section 3 and 4")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Upload Success"),
-            @ApiResponse(responseCode = "500", description = "Internal Server Error")
-    })
-    @PostMapping(value = "/upload-3-4",
-            consumes = "multipart/form-data",
-            produces = "application/json")
-    public ResponseEntity<Upload3and4ResponseDto> uploadSds(
-            @ModelAttribute UploadRequestDto request);
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Upload Success"), @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    @PostMapping(value = "/upload-3-4", consumes = "multipart/form-data", produces = "application/json")
+    public ResponseEntity<Upload3and4ResponseDto> uploadSds(@ModelAttribute UploadRequestDto request);
 
     /* ================= GET Ingredients by SDS ================= */
     @Operation(summary = "Get Ingredients by SDS ID", description = "Fetch all ingredients for a given SDS ID")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Ingredients fetched successfully"),
-            @ApiResponse(responseCode = "500", description = "Internal Server Error")
-    })
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Ingredients fetched successfully"), @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     @GetMapping(value = "/sds/{sdsId}", produces = "application/json")
     ResponseEntity<List<IngredientResponseDTO>> getIngredientsBySdsId(@PathVariable Long sdsId);
 
     /* ================= UPDATE Ingredient ================= */
     @Operation(summary = "Update Ingredient", description = "Update ingredient details by ingredient ID")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Ingredient updated successfully"),
-            @ApiResponse(responseCode = "500", description = "Internal Server Error")
-    })
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Ingredient updated successfully"), @ApiResponse(responseCode = "500", description = "Internal Server Error")})
     @PutMapping(value = "/{ingredientId}", consumes = "application/json", produces = "application/json")
-    ResponseEntity<IngredientResponseDTO> updateIngredient(
-            @PathVariable Long ingredientId,
-            @RequestBody UpdateIngredientRequestDTO request
-    );
+    ResponseEntity<IngredientResponseDTO> updateIngredient(@PathVariable Long ingredientId, @RequestBody UpdateIngredientRequestDTO request);
 
     /* ================= DELETE Ingredient ================= */
     @Operation(summary = "Delete Ingredient", description = "Delete ingredient by ID")

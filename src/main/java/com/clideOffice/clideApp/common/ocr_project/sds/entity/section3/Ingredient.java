@@ -37,6 +37,20 @@ public class Ingredient {
 
     private String classification;
 
+    // BLOB storage
+    @Lob
+    @Column(name = "file_data", columnDefinition = "LONGBLOB")
+    private byte[] fileData;
+
+    @Column(name = "file_name")
+    private String fileName;
+
+    @Column(name = "file_type")
+    private String fileType;
+
+    @Column(name = "file_hash", unique = true)
+    private String fileHash;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 
@@ -48,9 +62,13 @@ public class Ingredient {
 
     @PrePersist
     public void prePersist() {
+
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        if (this.isActive == null) this.isActive = true;
+
+        if (this.isActive == null) {
+            this.isActive = true;
+        }
     }
 
     @PreUpdate

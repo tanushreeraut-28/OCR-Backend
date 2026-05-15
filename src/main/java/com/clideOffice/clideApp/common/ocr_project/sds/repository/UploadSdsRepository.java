@@ -1,24 +1,22 @@
 package com.clideOffice.clideApp.common.ocr_project.sds.repository;
 
+import com.clideOffice.clideApp.common.ocr_project.sds.entity.section1.SdsMaster;
+import com.clideOffice.clideApp.common.ocr_project.sds.interfaces.UploadProjection;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import jakarta.transaction.Transactional;
-
-import com.clideOffice.clideApp.common.ocr_project.sds.entity.section1.SdsMaster;
-import com.clideOffice.clideApp.common.ocr_project.sds.interfaces.UploadProjection;
-
 @Repository
-public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
+public interface UploadSdsRepository extends JpaRepository<SdsMaster, Long> {
 
     /* =====================================================
        DUPLICATE DETECTION
     ===================================================== */
     @Query(value = """
-        SELECT
+        SELECT 
             id AS sdsId,
             product_identifier AS productIdentifier,
             current_version AS currentVersion
@@ -38,9 +36,11 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
     @Transactional
     @Query(value = """
         INSERT INTO sds_master
-        (product_identifier, sds_number, manufacturer_info, current_version, status, created_by, created_at, updated_at)
+        (product_identifier, sds_number, manufacturer_info,
+         current_version, status, created_by, created_at, updated_at)
         VALUES
-        (:productIdentifier, :sdsNumber, :manufacturerInfo, 1, 'Draft', :createdBy, NOW(), NOW())
+        (:productIdentifier, :sdsNumber, :manufacturerInfo,
+         1, 'Draft', :createdBy, NOW(), NOW())
         """, nativeQuery = true)
     void insertSdsMaster(
             @Param("productIdentifier") String productIdentifier,
@@ -69,14 +69,18 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
     @Transactional
     @Query(value = """
         INSERT INTO sds_version
-        (sds_id, version_number, file_url, change_notes, uploaded_by)
+        (sds_id, version_number, file_name, file_type,
+         file_data, change_notes, uploaded_by)
         VALUES
-        (:sdsId, :versionNumber, :fileUrl, :changeNotes, :uploadedBy)
+        (:sdsId, :versionNumber, :fileName, :fileType,
+         :fileData, :changeNotes, :uploadedBy)
         """, nativeQuery = true)
     void insertVersion(
             @Param("sdsId") Long sdsId,
             @Param("versionNumber") Integer versionNumber,
-            @Param("fileUrl") String fileUrl,
+            @Param("fileName") String fileName,
+            @Param("fileType") String fileType,
+            @Param("fileData") byte[] fileData,
             @Param("changeNotes") String changeNotes,
             @Param("uploadedBy") Long uploadedBy
     );
@@ -97,11 +101,15 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
     @Transactional
     @Query(value = """
         INSERT INTO sds_section1
-        (sds_id, version_id, product_identifier, other_identification, sds_number,
-         recommended_use, recommended_restrictions, manufacturer_info, source_type)
+        (sds_id, version_id, product_identifier,
+         other_identification, sds_number,
+         recommended_use, recommended_restrictions,
+         manufacturer_info, source_type)
         VALUES
-        (:sdsId, :versionId, :productIdentifier, :otherIdentification, :sdsNumber,
-         :recommendedUse, :recommendedRestrictions, :manufacturerInfo, :sourceType)
+        (:sdsId, :versionId, :productIdentifier,
+         :otherIdentification, :sdsNumber,
+         :recommendedUse, :recommendedRestrictions,
+         :manufacturerInfo, :sourceType)
         """, nativeQuery = true)
     void insertSection1(
             @Param("sdsId") Long sdsId,
@@ -122,9 +130,13 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
     @Transactional
     @Query(value = """
         INSERT INTO sds_section2_hazard
-        (sds_id, version_id, hazard_classification, signal_word, other_hazards, source_type, created_at, is_master)
+        (sds_id, version_id, hazard_classification,
+         signal_word, other_hazards,
+         source_type, created_at, is_master)
         VALUES
-        (:sdsId, :versionId, :hazardClassification, :signalWord, :otherHazards, :sourceType, NOW(), TRUE)
+        (:sdsId, :versionId, :hazardClassification,
+         :signalWord, :otherHazards,
+         :sourceType, NOW(), TRUE)
         """, nativeQuery = true)
     void insertSection2(
             @Param("sdsId") Long sdsId,
@@ -149,14 +161,16 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
     );
 
     /* =====================================================
-       SECTION 2 CHILD TABLES (FINAL FIXED)
+       SECTION 2 CHILD TABLES
     ===================================================== */
 
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO sds_hazard_statement (hazard_id, code, description, is_master)
-        VALUES (:hazardId, NULL, :text, TRUE)
+        INSERT INTO sds_hazard_statement
+        (hazard_id, code, description, is_master)
+        VALUES
+        (:hazardId, NULL, :text, TRUE)
         """, nativeQuery = true)
     void insertHazardStatements(
             @Param("hazardId") Long hazardId,
@@ -166,8 +180,10 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO sds_precautionary_statement (hazard_id, code, description, is_master)
-        VALUES (:hazardId, NULL, :text, TRUE)
+        INSERT INTO sds_precautionary_statement
+        (hazard_id, code, description, is_master)
+        VALUES
+        (:hazardId, NULL, :text, TRUE)
         """, nativeQuery = true)
     void insertPrecautionaryStatements(
             @Param("hazardId") Long hazardId,
@@ -177,8 +193,10 @@ public interface UploadRepository extends JpaRepository<SdsMaster, Long> {
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO sds_hazard_pictogram (hazard_id, image_url, code)
-        VALUES (:hazardId, :text, NULL)
+        INSERT INTO sds_hazard_pictogram
+        (hazard_id, image_url, code)
+        VALUES
+        (:hazardId, :text, NULL)
         """, nativeQuery = true)
     void insertPictograms(
             @Param("hazardId") Long hazardId,

@@ -2,7 +2,9 @@ package com.clideOffice.clideApp.common.ocr_project.sds.Section15.Controller;
 
 import com.clideOffice.clideApp.common.ocr_project.sds.Section15.Service.Section15Service;
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.Section15RequestDTO;
+import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UploadRequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.Section15ResponseDTO;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UploadSdsResponseDto;
 import com.clideOffice.clideApp.common.ocr_project.util.DatabaseContextHolder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,46 @@ import org.springframework.web.bind.annotation.RestController;
 public class Section15Controller implements Section15Interface {
 
     private final Section15Service section15Service;
+
+    /* ================= SDS Upload API 9 & 10 & 11 ================= */
+    @Override
+    public ResponseEntity<UploadSdsResponseDto> uploadSection15And16(UploadRequestDto request) {
+        try {
+            UploadSdsResponseDto response = section15Service.uploadSection15And16(request);
+            if ("DUPLICATE".equalsIgnoreCase(
+                    response.getStatus()
+            )) {
+                return ResponseEntity
+                        .status(HttpStatus.CONFLICT)
+                        .body(response);
+            }
+            if ("OCR_FAILED".equalsIgnoreCase(
+                    response.getStatus()
+            )) {
+                return ResponseEntity
+                        .status(HttpStatus.BAD_REQUEST)
+                        .body(response);
+            }
+            if ("FAILED".equalsIgnoreCase(
+                    response.getStatus()
+            )) {
+                return ResponseEntity
+                        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(response);
+            }
+            return ResponseEntity.ok(response);
+        } catch (Exception exception) {
+            log.error("Upload failed", exception);
+            UploadSdsResponseDto response = new UploadSdsResponseDto();
+            response.setStatus("FAILED");
+            response.setMessage(exception.getMessage());
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(response);
+        } finally {
+            DatabaseContextHolder.clear();
+        }
+    }
 
     /* ================= POST ================= */
     @Override

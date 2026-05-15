@@ -24,9 +24,28 @@ public class SdsVersion {
     @Column(name = "version_number")
     private Integer versionNumber;
 
+    // =========================
+    // OLD URL COLUMN
+    // =========================
     @Column(name = "file_url")
     private String fileUrl;
 
+    // =========================
+    // NEW BLOB STORAGE COLUMNS
+    // =========================
+    @Column(name = "file_name")
+    private String fileName;
+
+    @Column(name = "file_type")
+    private String fileType;
+
+    @Lob
+    @Column(name = "file_data", columnDefinition = "LONGBLOB")
+    private byte[] fileData;
+
+    // =========================
+    // OTHER FIELDS
+    // =========================
     @Column(name = "change_notes")
     private String changeNotes;
 

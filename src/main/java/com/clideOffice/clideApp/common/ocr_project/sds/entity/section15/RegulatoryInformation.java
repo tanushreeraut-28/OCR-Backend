@@ -1,3 +1,5 @@
+// ================= SECTION 15 ENTITY =================
+
 package com.clideOffice.clideApp.common.ocr_project.sds.entity.section15;
 
 import jakarta.persistence.*;
@@ -15,37 +17,87 @@ public class RegulatoryInformation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "sds_id")
     private Long sdsId;
 
-    /* 15.1 - Safety, health & environmental regulations */
-    @Column(columnDefinition = "TEXT")
+    @Column(
+            name = "safety_health_environmental_regulations",
+            columnDefinition = "TEXT"
+    )
     private String safetyHealthEnvironmentalRegulations;
 
-    /* 15.2 - Directive 2012/18/EU */
-    @Column(columnDefinition = "TEXT")
+    @Column(
+            name = "directive2012_18_eu",
+            columnDefinition = "TEXT"
+    )
     private String directive2012_18_EU;
 
-    /* 15.3 - REACH Annex XVII */
-    @Column(columnDefinition = "TEXT")
+    @Column(
+            name = "reach_annex_xvii",
+            columnDefinition = "TEXT"
+    )
     private String reachAnnexXVII;
 
-    /* 15.4 - Directive 2011/65/EU */
-    @Column(columnDefinition = "TEXT")
+    @Column(
+            name = "directive2011_65_eu",
+            columnDefinition = "TEXT"
+    )
     private String directive2011_65_EU;
 
-    /* 15.5 - Regulation (EU) 2019/1148 */
-    @Column(columnDefinition = "TEXT")
+    @Column(
+            name = "regulation_eu2019_1148",
+            columnDefinition = "TEXT"
+    )
     private String regulationEU2019_1148;
 
-    /* 15.6 - Regulation (EC) No 273/2004 */
-    @Column(columnDefinition = "TEXT")
+    @Column(
+            name = "regulation_ec273_2004",
+            columnDefinition = "TEXT"
+    )
     private String regulationEC273_2004;
 
-    /* 15.7 - Regulation (EC) No 111/2005 */
-    @Column(columnDefinition = "TEXT")
+    @Column(
+            name = "regulation_ec111_2005",
+            columnDefinition = "TEXT"
+    )
     private String regulationEC111_2005;
 
-    /* Chemical Safety Assessment */
-    @Column(columnDefinition = "TEXT")
+    @Column(
+            name = "chemical_safety_assessment",
+            columnDefinition = "TEXT"
+    )
     private String chemicalSafetyAssessment;
+
+    // ================= FILE STORE =================
+
+    @Lob
+    @Column(
+            name = "file_data",
+            columnDefinition = "LONGBLOB"
+    )
+    private byte[] fileData;
+
+    @Column(name = "file_name")
+    private String fileName;
+
+    @Column(name = "file_type")
+    private String fileType;
+
+    @Column(
+            name = "file_hash",
+            unique = true,
+            length = 500
+    )
+    private String fileHash;
+
+    // ================= COMMON =================
+
+    @Column(name = "is_active")
+    private Boolean isActive;
+
+    @Column(name = "created_at")
+    private java.sql.Timestamp createdAt;
+
+    @Column(name = "updated_at")
+    private java.sql.Timestamp updatedAt;
 }

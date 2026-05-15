@@ -41,6 +41,20 @@ public class FirstAidMeasures {
     @Column(name = "immediate_medical_attention", columnDefinition = "TEXT")
     private String immediateMedicalAttention;
 
+    // BLOB storage
+    @Lob
+    @Column(name = "file_data", columnDefinition = "LONGBLOB")
+    private byte[] fileData;
+
+    @Column(name = "file_name")
+    private String fileName;
+
+    @Column(name = "file_type")
+    private String fileType;
+
+    @Column(name = "file_hash", unique = true)
+    private String fileHash;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 
@@ -49,8 +63,12 @@ public class FirstAidMeasures {
 
     @PrePersist
     public void prePersist() {
+
         this.updatedAt = LocalDateTime.now();
-        if (this.isActive == null) this.isActive = true;
+
+        if (this.isActive == null) {
+            this.isActive = true;
+        }
     }
 
     @PreUpdate

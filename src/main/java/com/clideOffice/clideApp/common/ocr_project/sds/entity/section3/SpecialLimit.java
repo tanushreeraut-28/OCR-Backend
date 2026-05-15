@@ -32,6 +32,9 @@ public class SpecialLimit {
     @Column(name = "sds_id", nullable = false)
     private Long sdsId;
 
+    @Column(name = "hazard_phrase", columnDefinition = "TEXT")
+    private String hazardPhrase;
+
     @PrePersist
     public void prePersist() {
         this.updatedAt = LocalDateTime.now();

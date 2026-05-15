@@ -17,14 +17,21 @@ import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.Upload3and4Re
 import lombok.RequiredArgsConstructor;
 
 import net.sourceforge.tess4j.Tesseract;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.PDFRenderer;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -40,13 +47,13 @@ public class Section3ServiceImpl implements Section3Service {
     private final UploadRepository3and4 repository;
 
 
-    private final AmazonS3 amazonS3;
-
-    @Value("${amazon.url}")
-    private String amazonUrl;
-
-    @Value("${aws.s3.bucket.qaclide}")
-    private String bucketName;
+//    private final AmazonS3 amazonS3;
+//
+//    @Value("${amazon.url}")
+//    private String amazonUrl;
+//
+//    @Value("${aws.s3.bucket.qaclide}")
+//    private String bucketName;
 
     @Value("${tesseract.datapath}")
     private String tessDataPath;
@@ -58,295 +65,1097 @@ public class Section3ServiceImpl implements Section3Service {
     );
 
 
-    //Upload
-    @Override
-    public Upload3and4ResponseDto uploadSection3and4(UploadRequestDto request) {
+    // ================= UPLOAD SERVICE METHOD =================
 
-        Upload3and4ResponseDto response = new Upload3and4ResponseDto();
+    @Override
+    @Transactional
+    public Upload3and4ResponseDto uploadSection3and4(
+            UploadRequestDto request
+    ) {
 
         try {
+
+            // ================= FILE VALIDATION =================
+
             MultipartFile file = request.getFile();
 
             if (file == null || file.isEmpty()) {
-                throw new RuntimeException("File is empty");
+
+                throw new RuntimeException(
+                        "File is empty"
+                );
             }
 
-            // ================= CREATE FOLDER =================
-            String uploadDir = System.getProperty("user.dir") + File.separator + "uploads";
-            File folder = new File(uploadDir);
+            String fileName =
+                    file.getOriginalFilename();
 
-            if (!folder.exists()) {
-                if (!folder.mkdirs()) {
-                    throw new RuntimeException("Failed to create upload directory");
-                }
-            }
+            String fileType =
+                    file.getContentType();
 
-            // ================= FILE NAME =================
-            String originalFileName = file.getOriginalFilename();
-            if (originalFileName == null) {
-                throw new RuntimeException("Invalid file name");
+            byte[] fileData =
+                    file.getBytes();
+
+            // ================= FILE HASH =================
+
+            String fileHash =
+                    generateHash(fileData);
+
+            // ================= DUPLICATE CHECK =================
+
+            Integer duplicateCount =
+                    repository.checkDuplicateFile(
+                            fileHash
+                    );
+
+            if (duplicateCount != null
+                    && duplicateCount > 0) {
+
+                throw new RuntimeException(
+                        "Duplicate file already uploaded"
+                );
             }
 
             // ================= SDS ID =================
-            Long sdsId = System.currentTimeMillis();
+            // Generates: 1,2,3,4,5....
 
-            // ================= EXTENSION =================
-            String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+            Long sdsId =
+                    repository.generateNextSdsId();
 
-            // ================= FINAL FILE NAME =================
-            String finalFileName = sdsId + "_" + request.getSectionType().toLowerCase() + fileExtension;
+            // ================= TEMP FILE =================
 
-            File savedFile = new File(folder, finalFileName);
+            File tempFile =
+                    File.createTempFile(
+                            "ocr_",
+                            fileName
+                    );
 
-            // ================= SAVE FILE =================
-            try (InputStream in = file.getInputStream();
-                 FileOutputStream out = new FileOutputStream(savedFile)) {
-
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                }
-            }
+            file.transferTo(tempFile);
 
             // ================= OCR =================
-            String rawText = runOCR(savedFile);
-            String text = cleanOcrText(rawText);
 
-            // 🔥 DEBUG (IMPORTANT)
-            System.out.println("==== OCR TEXT START ====");
-            System.out.println(text);
-            System.out.println("==== OCR TEXT END ====");
+            String text =
+                    cleanOcrText(
+                            runOCR(tempFile)
+                    );
 
             // ================= SECTION 3 =================
-            if ("SECTION_3".equalsIgnoreCase(request.getSectionType())) {
 
-                List<String[]> ingredients = extractIngredients(text);
+            if ("SECTION_3".equalsIgnoreCase(
+                    request.getSectionType()
+            )) {
 
-                // 🔥 DEBUG
-                System.out.println("INGREDIENT COUNT: " + ingredients.size());
+                List<String[]> ingredients =
+                        extractIngredients(text);
 
                 for (String[] i : ingredients) {
 
-                    // 🔥 FIX: normalize CAS number
-                    String cas = i[1] != null ? i[1].replaceAll("\\s+", "-") : null;
-
-                    // ❗ TEMP FIX: skip duplicate check
                     repository.insertIngredient(
+
                             sdsId,
-                            i[0],                // chemical_name
-                            cas,                 // fixed CAS
-                            i[2],                // ec_number
-                            null, null,
-                            i[3]                 // classification
+
+                            i[0],
+
+                            i[1],
+
+                            i[2],
+
+                            extractMin(i[3]),
+
+                            extractMax(i[3]),
+
+                            i[4],
+
+                            fileData,
+
+                            fileName,
+
+                            fileType,
+
+                            fileHash
                     );
                 }
 
-                extractLimits(text).forEach(l ->
-                        repository.insertSpecialLimit(
-                                sdsId,
-                                l[0], l[1], null, null
-                        )
-                );
+                extractLimits(text)
+                        .forEach(l ->
+
+                                repository.insertSpecialLimit(
+
+                                        sdsId,
+
+                                        l[0],
+
+                                        l[1],
+
+                                        l[2]
+                                )
+                        );
             }
 
             // ================= SECTION 4 =================
-            if ("SECTION_4".equalsIgnoreCase(request.getSectionType())) {
+
+            if ("SECTION_4".equalsIgnoreCase(
+                    request.getSectionType()
+            )) {
 
                 repository.insertFirstAid(
+
                         sdsId,
-                        extractBlock(text, "Emergency Overview", "General Advice"),
-                        extractBlock(text, "General Advice", "After Inhalation"),
-                        extractBlock(text, "After Inhalation", "After Skin Contact"),
-                        extractBlock(text, "After Skin Contact", "After Eye Contact"),
-                        extractBlock(text, "After Eye Contact", "After Swallowing"),
-                        extractBlock(text, "After Swallowing", "Immediate Medical Attention"),
-                        extractBlock(text, "Immediate Medical Attention", null)
+
+                        safe(
+                                extractBlock(
+                                        text,
+                                        "Emergency Overview",
+                                        "General Advice"
+                                )
+                        ),
+
+                        safe(
+                                extractBlock(
+                                        text,
+                                        "General Advice",
+                                        "After Inhalation"
+                                )
+                        ),
+
+                        safe(
+                                extractBlock(
+                                        text,
+                                        "After Inhalation",
+                                        "After Skin Contact"
+                                )
+                        ),
+
+                        safe(
+                                extractBlock(
+                                        text,
+                                        "After Skin Contact",
+                                        "After Eye Contact"
+                                )
+                        ),
+
+                        safe(
+                                extractBlock(
+                                        text,
+                                        "After Eye Contact",
+                                        "After Swallowing"
+                                )
+                        ),
+
+                        safe(
+                                extractBlock(
+                                        text,
+                                        "After Swallowing",
+                                        "Immediate Medical Attention"
+                                )
+                        ),
+
+                        safe(
+                                extractBlock(
+                                        text,
+                                        "Immediate Medical Attention",
+                                        null
+                                )
+                        ),
+
+                        fileData,
+
+                        fileName,
+
+                        fileType,
+
+                        fileHash
                 );
 
-                extractTreatments(text).forEach(t ->
-                        repository.insertSpecialTreatment(sdsId, t)
-                );
+                // ================= SPECIAL TREATMENTS =================
+
+                List<String> treatments =
+                        extractTreatments(text);
+
+                for (String treatment : treatments) {
+
+                    if (treatment != null
+                            && !treatment.isBlank()) {
+
+                        repository.insertSpecialTreatment(
+                                sdsId,
+                                treatment
+                        );
+                    }
+                }
+
+                // ================= SYMPTOMS =================
+
+                List<String> symptoms =
+                        extractSymptoms(text);
+
+                for (String symptom : symptoms) {
+
+                    if (symptom != null
+                            && !symptom.isBlank()) {
+
+                        repository.insertSymptom(
+                                sdsId,
+                                symptom
+                        );
+                    }
+                }
             }
 
-            // ================= S3 UPLOAD =================
-            String s3Key = "sds/" + finalFileName;
-            amazonS3.putObject(bucketName, s3Key, savedFile);
+            // ================= DELETE TEMP FILE =================
 
-            String fileUrl = "https://" + bucketName + ".s3.ap-south-1.amazonaws.com/" + s3Key;
+            tempFile.delete();
 
             // ================= RESPONSE =================
+
+            Upload3and4ResponseDto response =
+                    new Upload3and4ResponseDto();
+
             response.setStatus("SUCCESS");
+
             response.setSdsId(sdsId);
+
             response.setVersion(1);
-            response.setFileUrl(fileUrl);
-            response.setMessage("Uploaded successfully");
+
+            response.setMessage(
+                    "Uploaded successfully"
+            );
 
             return response;
 
         } catch (Exception e) {
-            throw new RuntimeException("Upload failed: " + e.getMessage());
+
+            e.printStackTrace();
+
+            throw new RuntimeException(
+                    "Upload failed : "
+                            + e.getMessage()
+            );
         }
     }
 
-    // Helper Code
-    // ================= OCR METHOD =================
-    public static String runOCR(File file) {
-        try {
-            Tesseract tesseract = new Tesseract();
-            tesseract.setDatapath("C:\\Program Files\\Tesseract-OCR\\tessdata");
 
-            String fileName = file.getName().toLowerCase();
+// ================= OCR METHOD =================
+public static String runOCR(File file) {
 
-            // ✅ IF PDF → convert to images manually
-            if (fileName.endsWith(".pdf")) {
+    try {
 
-                StringBuilder result = new StringBuilder();
+        String fileName = file.getName().toLowerCase();
 
-                // 👉 PDFBox 2.x compatible
-                try (org.apache.pdfbox.pdmodel.PDDocument document =
-                             org.apache.pdfbox.pdmodel.PDDocument.load(file)) {
+        Tesseract tesseract = new Tesseract();
 
-                    org.apache.pdfbox.rendering.PDFRenderer renderer =
-                            new org.apache.pdfbox.rendering.PDFRenderer(document);
+        tesseract.setDatapath("C:\\Program Files\\Tesseract-OCR\\tessdata");
 
-                    for (int i = 0; i < document.getNumberOfPages(); i++) {
+        // ================= PDF SUPPORT =================
 
-                        java.awt.image.BufferedImage image =
-                                renderer.renderImageWithDPI(i, 300);
+        if (fileName.endsWith(".pdf")) {
 
-                        result.append(tesseract.doOCR(image)).append("\n");
-                    }
+            StringBuilder result = new StringBuilder();
+
+            try (PDDocument document = PDDocument.load(file)) {
+
+                PDFRenderer renderer = new PDFRenderer(document);
+
+                for (int i = 0; i < document.getNumberOfPages(); i++) {
+
+                    BufferedImage image =
+                            renderer.renderImageWithDPI(i, 300);
+
+                    result.append(
+                            tesseract.doOCR(image)
+                    ).append("\n");
                 }
-
-                return result.toString();
             }
 
-            // ✅ IF IMAGE → direct OCR
+            return result.toString();
+        }
+
+        // ================= IMAGE SUPPORT =================
+
+        if (
+                fileName.endsWith(".png")
+                        || fileName.endsWith(".jpg")
+                        || fileName.endsWith(".jpeg")
+                        || fileName.endsWith(".bmp")
+                        || fileName.endsWith(".tiff")
+                        || fileName.endsWith(".tif")
+        ) {
+
             return tesseract.doOCR(file);
+        }
+
+        // ================= TXT SUPPORT =================
+
+        if (fileName.endsWith(".txt")) {
+
+            return Files.readString(file.toPath());
+        }
+
+        // ================= DOCX SUPPORT =================
+
+        if (fileName.endsWith(".docx")) {
+
+            StringBuilder text = new StringBuilder();
+
+            try (FileInputStream fis = new FileInputStream(file);
+                 XWPFDocument document = new XWPFDocument(fis)) {
+
+                document.getParagraphs().forEach(p ->
+                        text.append(p.getText()).append("\n")
+                );
+            }
+
+            return text.toString();
+        }
+
+        // ================= DOC SUPPORT =================
+
+        if (fileName.endsWith(".doc")) {
+
+            throw new RuntimeException(
+                    ".doc format not supported currently. Use .docx instead."
+            );
+        }
+
+        // ================= UNSUPPORTED =================
+
+        throw new RuntimeException(
+                "Unsupported file format"
+        );
+
+    } catch (Exception e) {
+
+        throw new RuntimeException(
+                "OCR failed : " + e.getMessage()
+        );
+    }
+}
+
+
+// ================= CLEAN OCR TEXT =================
+
+    public static String cleanOcrText(
+            String text
+    ) {
+
+        try {
+
+            if (text == null) {
+                return "";
+            }
+
+            return text
+
+                    .replaceAll(
+                            "[^\\x00-\\x7F]",
+                            " "
+                    )
+
+                    .replaceAll(
+                            "\\r",
+                            "\n"
+                    )
+
+                    .replaceAll(
+                            "\\n+",
+                            "\n"
+                    )
+
+                    .replaceAll(
+                            "\\s+",
+                            " "
+                    )
+
+                    .trim();
 
         } catch (Exception e) {
-            throw new RuntimeException("OCR failed: " + e.getMessage());
+
+            e.printStackTrace();
+
+            return "";
         }
     }
 
-    // ================= CLEAN OCR TEXT =================
-    public static String cleanOcrText(String text) {
 
-        if (text == null) return "";
+// ================= HASH GENERATION =================
 
-        return text
-                .replaceAll("[^\\x00-\\x7F]", " ")
-                .replaceAll("\\r", "\n")
-                .replaceAll("\\n+", "\n")
-                .replaceAll("\\s+", " ")
-                .trim();
-    }
+    public static String generateHash(
+            byte[] fileData
+    ) {
 
-    // ================= SAFE NULL HANDLER =================
-    public static String safe(String value) {
-        return (value == null || value.trim().isEmpty()) ? null : value.trim();
-    }
+        try {
 
-    // ================= EXTRACT INGREDIENTS =================
-    public static List<String[]> extractIngredients(String text) {
+            MessageDigest md =
+                    MessageDigest.getInstance(
+                            "SHA-256"
+                    );
 
-        List<String[]> list = new ArrayList<>();
-        if (text == null || text.isEmpty()) return list;
+            byte[] hashBytes =
+                    md.digest(fileData);
 
-        // ✅ MORE FLEXIBLE PATTERN
-        Pattern pattern = Pattern.compile(
-                "([A-Za-z\\s\\-]+?)\\s+(\\d{2,7}[-\\s]?\\d{2}[-\\s]?\\d).*?(H\\d{3})?",
-                Pattern.CASE_INSENSITIVE
-        );
+            StringBuilder sb =
+                    new StringBuilder();
 
-        Matcher m = pattern.matcher(text);
+            for (byte b : hashBytes) {
 
-        while (m.find()) {
-
-            String chemical = safe(m.group(1));
-            String cas = safe(m.group(2));
-            String classification = safe(m.group(3));
-
-            // 🔥 CLEAN CAS FORMAT
-            if (cas != null) {
-                cas = cas.replaceAll("\\s+", "-");
+                sb.append(
+                        String.format(
+                                "%02x",
+                                b
+                        )
+                );
             }
 
-            list.add(new String[]{
-                    chemical,
-                    cas,
-                    null,          // ec_number
-                    classification
-            });
+            return sb.toString();
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            throw new RuntimeException(
+                    "Hash generation failed"
+            );
+        }
+    }
+
+
+// ================= SAFE METHOD =================
+
+    public static String safe(
+            String value
+    ) {
+
+        return value == null
+                || value.trim().isEmpty()
+
+                ? null
+
+                : value.trim();
+    }
+
+
+// ================= EXTRACT INGREDIENTS =================
+
+    public static List<String[]> extractIngredients(
+            String text
+    ) {
+
+        List<String[]> list =
+                new ArrayList<>();
+
+        Pattern pattern =
+                Pattern.compile(
+
+                        "([A-Za-z\\s]+)\\s+"
+                                +
+                                "(\\d{2,7}-\\d{2}-\\d)\\s*"
+                                +
+                                "(\\d{3}-\\d{3}-\\d)?\\s*"
+                                +
+                                "(\\d+\\-\\d+%|\\d+%)?\\s*"
+                                +
+                                "(H\\d{3}[^\\n]*)?",
+
+                        Pattern.CASE_INSENSITIVE
+                );
+
+        Matcher matcher =
+                pattern.matcher(text);
+
+        while (matcher.find()) {
+
+            String concentration =
+                    safe(
+                            matcher.group(4)
+                    );
+
+            list.add(
+
+                    new String[]{
+
+                            safe(
+                                    matcher.group(1)
+                            ),
+
+                            safe(
+                                    matcher.group(2)
+                            ),
+
+                            safe(
+                                    matcher.group(3)
+                            ),
+
+                            concentration,
+
+                            safe(
+                                    matcher.group(5)
+                            )
+                    }
+            );
         }
 
         return list;
     }
 
-    // ================= EXTRACT SPECIAL LIMITS =================
-    public static List<String[]> extractLimits(String text) {
 
-        List<String[]> list = new ArrayList<>();
-        if (text == null || text.isEmpty()) return list;
+// ================= EXTRACT LIMITS =================
 
-        Pattern pattern = Pattern.compile(
-                "([A-Za-z\\s]+)\\s+(\\d+%|\\d+\\.\\d+%)",
-                Pattern.CASE_INSENSITIVE
-        );
+    public static List<String[]> extractLimits(
+            String text
+    ) {
 
-        Matcher m = pattern.matcher(text);
+        List<String[]> list =
+                new ArrayList<>();
 
-        while (m.find()) {
-            list.add(new String[]{
-                    safe(m.group(1)), // substance_name
-                    safe(m.group(2))  // limit_value
-            });
+        Pattern pattern =
+                Pattern.compile(
+
+                        "([A-Za-z\\s]+)\\s+"
+                                +
+                                "(\\d+%|\\d+\\.\\d+%)\\s+"
+                                +
+                                "(H\\d{3}.*?)",
+
+                        Pattern.CASE_INSENSITIVE
+                );
+
+        Matcher matcher =
+                pattern.matcher(text);
+
+        while (matcher.find()) {
+
+            list.add(
+
+                    new String[]{
+
+                            safe(
+                                    matcher.group(1)
+                            ),
+
+                            safe(
+                                    matcher.group(2)
+                            ),
+
+                            safe(
+                                    matcher.group(3)
+                            )
+                    }
+            );
         }
 
         return list;
     }
 
-    // ================= EXTRACT TEXT BLOCK =================
-    public static String extractBlock(String text, String start, String end) {
 
-        if (text == null) return null;
+// ================= EXTRACT BLOCK =================
 
-        int startIndex = text.toLowerCase().indexOf(start.toLowerCase());
-        if (startIndex == -1) return null;
+    public static String extractBlock(
 
-        int endIndex;
+            String text,
 
-        if (end != null) {
-            endIndex = text.toLowerCase().indexOf(end.toLowerCase(), startIndex);
-            if (endIndex == -1) endIndex = text.length();
-        } else {
-            endIndex = text.length();
+            String start,
+
+            String end
+    ) {
+
+        try {
+
+            if (text == null) {
+                return null;
+            }
+
+            String lowerText =
+                    text.toLowerCase();
+
+            int startIndex =
+                    lowerText.indexOf(
+                            start.toLowerCase()
+                    );
+
+            if (startIndex == -1) {
+                return null;
+            }
+
+            int endIndex;
+
+            if (end != null) {
+
+                endIndex =
+                        lowerText.indexOf(
+                                end.toLowerCase(),
+                                startIndex
+                        );
+
+                if (endIndex == -1) {
+                    endIndex =
+                            text.length();
+                }
+
+            } else {
+
+                endIndex =
+                        text.length();
+            }
+
+            return text.substring(
+                    startIndex,
+                    endIndex
+            ).trim();
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return null;
         }
-
-        return text.substring(startIndex, endIndex).trim();
     }
 
-    // ================= EXTRACT SPECIAL TREATMENTS =================
-    public static List<String> extractTreatments(String text) {
 
-        List<String> list = new ArrayList<>();
-        if (text == null || text.isEmpty()) return list;
+// ================= EXTRACT MIN =================
 
-        Pattern pattern = Pattern.compile(
-                "(Immediate medical attention.*?)(\\.|\\n)",
-                Pattern.CASE_INSENSITIVE
-        );
+    public static Double extractMin(
+            String value
+    ) {
 
-        Matcher m = pattern.matcher(text);
+        try {
 
-        while (m.find()) {
-            list.add(safe(m.group(1)));
+            if (value == null) {
+                return null;
+            }
+
+            value =
+                    value.replace(
+                            "%",
+                            ""
+                    ).trim();
+
+            if (value.contains("-")) {
+
+                return Double.parseDouble(
+                        value.split("-")[0]
+                );
+            }
+
+            return Double.parseDouble(value);
+
+        } catch (Exception e) {
+
+            return null;
+        }
+    }
+
+
+// ================= EXTRACT MAX =================
+
+    public static Double extractMax(
+            String value
+    ) {
+
+        try {
+
+            if (value == null) {
+                return null;
+            }
+
+            value =
+                    value.replace(
+                            "%",
+                            ""
+                    ).trim();
+
+            if (value.contains("-")) {
+
+                return Double.parseDouble(
+                        value.split("-")[1]
+                );
+            }
+
+            return Double.parseDouble(value);
+
+        } catch (Exception e) {
+
+            return null;
+        }
+    }
+
+
+// ================= EXTRACT TREATMENTS =================
+
+    public static List<String> extractTreatments(
+            String text
+    ) {
+
+        List<String> list =
+                new ArrayList<>();
+
+        Pattern pattern =
+                Pattern.compile(
+
+                        "(Immediate medical attention.*?)(\\.|\\n)",
+
+                        Pattern.CASE_INSENSITIVE
+                );
+
+        Matcher matcher =
+                pattern.matcher(text);
+
+        while (matcher.find()) {
+
+            String treatment =
+                    safe(
+                            matcher.group(1)
+                    );
+
+            if (treatment != null) {
+
+                list.add(treatment);
+            }
         }
 
         return list;
     }
+
+
+// ================= EXTRACT SYMPTOMS =================
+
+    public static List<String> extractSymptoms(
+            String text
+    ) {
+
+        List<String> list =
+                new ArrayList<>();
+
+        Pattern pattern =
+                Pattern.compile(
+
+                        "(symptoms.*?)(\\.|\\n)",
+
+                        Pattern.CASE_INSENSITIVE
+                );
+
+        Matcher matcher =
+                pattern.matcher(text);
+
+        while (matcher.find()) {
+
+            String symptom =
+                    safe(
+                            matcher.group(1)
+                    );
+
+            if (symptom != null) {
+
+                list.add(symptom);
+            }
+        }
+
+        return list;
+    }
+
+//    //Upload
+//    @Override
+//    @Transactional
+//    public Upload3and4ResponseDto uploadSection3and4(UploadRequestDto request) {
+//
+//        try {
+//
+//            // File validation
+//            MultipartFile file = request.getFile();
+//
+//            if (file == null || file.isEmpty()) {
+//                throw new RuntimeException("File is empty");
+//            }
+//
+//            String fileName = file.getOriginalFilename();
+//            String fileType = file.getContentType();
+//            byte[] fileData = file.getBytes();
+//
+//            String fileHash = generateHash(fileData);
+//
+//            if (repository.checkDuplicateFile(fileHash) > 0) {
+//                throw new RuntimeException("Duplicate file already uploaded");
+//            }
+//
+//            Long sdsId = System.currentTimeMillis();
+//
+//            File tempFile = File.createTempFile("ocr_", fileName);
+//            file.transferTo(tempFile);
+//
+//            String text = cleanOcrText(runOCR(tempFile));
+//
+//            if ("SECTION_3".equalsIgnoreCase(request.getSectionType())) {
+//
+//                List<String[]> ingredients = extractIngredients(text);
+//
+//                for (String[] i : ingredients) {
+//
+//                    repository.insertIngredient(
+//                            sdsId,
+//                            i[0],
+//                            i[1],
+//                            i[2],
+//                            extractMin(i[3]),
+//                            extractMax(i[3]),
+//                            i[4],
+//                            fileData,
+//                            fileName,
+//                            fileType,
+//                            fileHash
+//                    );
+//
+//                }
+//
+//                extractLimits(text).forEach(l ->
+//                        repository.insertSpecialLimit(
+//                                sdsId,
+//                                l[0],
+//                                l[1],
+//                                l[2]
+//                        )
+//                );
+//            }
+//
+//            if ("SECTION_4".equalsIgnoreCase(request.getSectionType())) {
+//                repository.insertFirstAid(
+//                        sdsId,
+//                        extractBlock(text, "Emergency Overview", "General Advice"),
+//                        extractBlock(text, "General Advice", "After Inhalation"),
+//                        extractBlock(text, "After Inhalation", "After Skin Contact"),
+//                        extractBlock(text, "After Skin Contact", "After Eye Contact"),
+//                        extractBlock(text, "After Eye Contact", "After Swallowing"),
+//                        extractBlock(text, "After Swallowing", "Immediate Medical Attention"),
+//                        extractBlock(text, "Immediate Medical Attention", null),
+//                        fileData,
+//                        fileName,
+//                        fileType,
+//                        fileHash
+//                );
+//                extractTreatments(text)
+//                        .forEach(t -> repository.insertSpecialTreatment(sdsId, t));
+//                extractSymptoms(text)
+//                        .forEach(s -> repository.insertSymptom(sdsId, s));
+//            }
+//            tempFile.delete();
+//
+//            Upload3and4ResponseDto response = new Upload3and4ResponseDto();
+//            response.setStatus("SUCCESS");
+//            response.setSdsId(sdsId);
+//            response.setVersion(1);
+//            response.setMessage("Uploaded successfully");
+//            return response;
+//        } catch (Exception e) {
+//            throw new RuntimeException("Upload failed : " + e.getMessage());
+//        }
+//    }
+//
+//
+//// Helper methods
+//    public static String runOCR(File file) {
+//        try {
+//            Tesseract tesseract = new Tesseract();
+//            tesseract.setDatapath("C:\\Program Files\\Tesseract-OCR\\tessdata");
+//
+//            if (file.getName().toLowerCase().endsWith(".pdf")) {
+//                StringBuilder result = new StringBuilder();
+//                try (PDDocument document = PDDocument.load(file)) {
+//                    PDFRenderer renderer = new PDFRenderer(document);
+//                    for (int i = 0; i < document.getNumberOfPages(); i++) {
+//                        BufferedImage image = renderer.renderImageWithDPI(i, 300);
+//                        result.append(tesseract.doOCR(image)).append("\n");
+//                    }
+//                }
+//                return result.toString();
+//            }
+//
+//            return tesseract.doOCR(file);
+//
+//        } catch (Exception e) {
+//            throw new RuntimeException("OCR failed : " + e.getMessage());
+//        }
+//    }
+//
+//    public static String cleanOcrText(String text) {
+//
+//        if (text == null) return "";
+//
+//        return text
+//                .replaceAll("[^\\x00-\\x7F]", " ")
+//                .replaceAll("\\r", "\n")
+//                .replaceAll("\\n+", "\n")
+//                .replaceAll("\\s+", " ")
+//                .trim();
+//    }
+//
+//    public static String generateHash(byte[] fileData) {
+//
+//        try {
+//
+//            MessageDigest md = MessageDigest.getInstance("SHA-256");
+//
+//            byte[] hashBytes = md.digest(fileData);
+//
+//            StringBuilder sb = new StringBuilder();
+//
+//            for (byte b : hashBytes) {
+//                sb.append(String.format("%02x", b));
+//            }
+//
+//            return sb.toString();
+//
+//        } catch (Exception e) {
+//            throw new RuntimeException("Hash generation failed");
+//        }
+//    }
+//
+//    public static String safe(String value) {
+//        return value == null || value.trim().isEmpty() ? null : value.trim();
+//    }
+//
+//    public static List<String[]> extractIngredients(String text) {
+//
+//        List<String[]> list = new ArrayList<>();
+//
+//        Pattern pattern = Pattern.compile(
+//                "([A-Za-z\\s]+)\\s+" +
+//                        "(\\d{2,7}-\\d{2}-\\d)\\s*" +
+//                        "(\\d{3}-\\d{3}-\\d)?\\s*" +
+//                        "(\\d+\\-\\d+%|\\d+%)?\\s*" +
+//                        "(H\\d{3}[^\\n]*)?",
+//                Pattern.CASE_INSENSITIVE
+//        );
+//
+//        Matcher matcher = pattern.matcher(text);
+//
+//        while (matcher.find()) {
+//
+//            String concentration = safe(matcher.group(4));
+//
+//            list.add(new String[]{
+//                    safe(matcher.group(1)),
+//                    safe(matcher.group(2)),
+//                    safe(matcher.group(3)),
+//                    concentration,
+//                    safe(matcher.group(5))
+//            });
+//        }
+//
+//        return list;
+//    }
+//
+//    public static List<String[]> extractLimits(String text) {
+//
+//        List<String[]> list = new ArrayList<>();
+//
+//        Pattern pattern = Pattern.compile(
+//                "([A-Za-z\\s]+)\\s+" +
+//                        "(\\d+%|\\d+\\.\\d+%)\\s+" +
+//                        "(H\\d{3}.*?)",
+//                Pattern.CASE_INSENSITIVE
+//        );
+//
+//        Matcher matcher = pattern.matcher(text);
+//
+//        while (matcher.find()) {
+//
+//            list.add(new String[]{
+//                    safe(matcher.group(1)),
+//                    safe(matcher.group(2)),
+//                    safe(matcher.group(3))
+//            });
+//        }
+//
+//        return list;
+//    }
+//
+//    public static String extractBlock(String text, String start, String end) {
+//
+//        if (text == null) return null;
+//
+//        int startIndex = text.toLowerCase().indexOf(start.toLowerCase());
+//
+//        if (startIndex == -1) return null;
+//
+//        int endIndex = end != null
+//                ? text.toLowerCase().indexOf(end.toLowerCase(), startIndex)
+//                : text.length();
+//
+//        if (endIndex == -1) endIndex = text.length();
+//
+//        return text.substring(startIndex, endIndex).trim();
+//    }
+//
+//    public static Double extractMin(String value) {
+//
+//        try {
+//
+//            if (value == null) return null;
+//
+//            value = value.replace("%", "").trim();
+//
+//            if (value.contains("-")) {
+//                return Double.parseDouble(value.split("-")[0]);
+//            }
+//
+//            return Double.parseDouble(value);
+//
+//        } catch (Exception e) {
+//            return null;
+//        }
+//    }
+//
+//    public static Double extractMax(String value) {
+//
+//        try {
+//
+//            if (value == null) return null;
+//
+//            value = value.replace("%", "").trim();
+//
+//            if (value.contains("-")) {
+//                return Double.parseDouble(value.split("-")[1]);
+//            }
+//
+//            return Double.parseDouble(value);
+//
+//        } catch (Exception e) {
+//            return null;
+//        }
+//    }
+//
+//    public static List<String> extractTreatments(String text) {
+//
+//        List<String> list = new ArrayList<>();
+//
+//        Pattern pattern = Pattern.compile(
+//                "(Immediate medical attention.*?)(\\.|\\n)",
+//                Pattern.CASE_INSENSITIVE
+//        );
+//
+//        Matcher matcher = pattern.matcher(text);
+//
+//        while (matcher.find()) {
+//            list.add(safe(matcher.group(1)));
+//        }
+//
+//        return list;
+//    }
+//
+//    public static List<String> extractSymptoms(String text) {
+//
+//        List<String> list = new ArrayList<>();
+//
+//        Pattern pattern = Pattern.compile(
+//                "(symptoms.*?)(\\.|\\n)",
+//                Pattern.CASE_INSENSITIVE
+//        );
+//
+//        Matcher matcher = pattern.matcher(text);
+//
+//        while (matcher.find()) {
+//            list.add(safe(matcher.group(1)));
+//        }
+//
+//        return list;
+//    }
 
 
 

@@ -1,7 +1,9 @@
 package com.clideOffice.clideApp.common.ocr_project.sds.Section10.Controller;
 
 import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.Section10RequestDTO;
+import com.clideOffice.clideApp.common.ocr_project.sds.requestDto.UploadRequestDto;
 import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.Section10ResponseDTO;
+import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UploadSdsResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -15,6 +17,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/section10")
 @Tag(name = "SDS Section 10 API", description = "Operations related to SDS Section 10")
 public interface Section10Interface {
+
+    /* ================= SDS Upload API 12 & 13 & 14 ================= */
+    @Operation(summary = "Upload SDS File", description = "Upload SDS document")
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "Upload Success"), @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+    @PostMapping(value = "/upload-12-13-14", consumes = "multipart/form-data", produces = "application/json")
+    ResponseEntity<UploadSdsResponseDto> uploadSection12And13And14(@ModelAttribute UploadRequestDto request);
 
     /* ================= POST ================= */
     @Operation(summary = "Add Section10 Item")

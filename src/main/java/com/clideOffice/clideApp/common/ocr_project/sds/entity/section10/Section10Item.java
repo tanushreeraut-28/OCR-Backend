@@ -1,11 +1,9 @@
 package com.clideOffice.clideApp.common.ocr_project.sds.entity.section10;
 
 import jakarta.persistence.*;
-
 import lombok.*;
 
 @Entity
-
 @Table(name = "section10_items")
 @Getter
 @Setter
@@ -20,8 +18,6 @@ public class Section10Item {
 
     private Long sdsId;
 
-    // e.g. "10.1 Reactivity", "10.2 Chemical Stability"
-
     private String itemName;
 
     @Column(columnDefinition = "TEXT")
@@ -32,5 +28,15 @@ public class Section10Item {
 
     private Boolean isDeleted = false;
 
+    // ================= FILE STORAGE =================
+
+    @Lob
+    @Column(columnDefinition = "LONGBLOB")
+    private byte[] fileData;
+
+    private String fileName;
+
+    private String fileType;
+
+    private String fileHash;
 }
- 
