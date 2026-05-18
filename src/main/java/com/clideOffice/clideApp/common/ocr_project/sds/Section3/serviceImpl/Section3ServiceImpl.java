@@ -1,6 +1,6 @@
 package com.clideOffice.clideApp.common.ocr_project.sds.Section3.serviceImpl;
 
-import com.amazonaws.services.s3.AmazonS3;
+//import com.amazonaws.services.s3.AmazonS3;
 import com.clideOffice.clideApp.common.ocr_project.sds.Section3.service.Section3Service;
 import com.clideOffice.clideApp.common.ocr_project.sds.entity.section3.Ingredient;
 import com.clideOffice.clideApp.common.ocr_project.sds.entity.section3.SpecialLimit;
