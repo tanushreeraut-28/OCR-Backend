@@ -1,8 +1,9 @@
 package com.clideOffice.clideApp.common.ocr_project.sds.entity.section7;
 
-
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.sql.Timestamp;
 
 @Entity
 @Table(name = "sds_safe_storage")
@@ -30,6 +31,7 @@ public class SafeStorage {
     @Column(columnDefinition = "TEXT")
     private String packagingMaterials;
 
+    @Column(columnDefinition = "TEXT")
     private String storageTemperature;
 
     @Column(columnDefinition = "TEXT")
@@ -40,4 +42,23 @@ public class SafeStorage {
 
     @Column(columnDefinition = "TEXT")
     private String additionalInformation;
+
+    // FILE
+
+    @Lob
+    @Column(columnDefinition = "LONGBLOB")
+    private byte[] fileData;
+
+    private String fileName;
+
+    private String fileType;
+
+    @Column(unique = true)
+    private String fileHash;
+
+    private Boolean isActive;
+
+    private Timestamp createdAt;
+
+    private Timestamp updatedAt;
 }

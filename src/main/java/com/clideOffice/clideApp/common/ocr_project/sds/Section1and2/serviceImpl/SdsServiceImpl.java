@@ -90,7 +90,7 @@ import net.sourceforge.tess4j.Tesseract;
 @Slf4j
 public class SdsServiceImpl implements SdsService {
 
-    private final UploadRepository uploadRepository;
+//    private final UploadRepository uploadRepository;
     private final UpdateSection1Repository updateSection1Repository;
     private final RemoveUserRepository removeUserRepository;
     private final OcrExtractedDataRepository repository;
@@ -107,199 +107,33 @@ public class SdsServiceImpl implements SdsService {
     private final HandleHazardOcrRepository hazardRepository;
     private final SdsOcrResultRepository ocrRepository;
 
-    private final AmazonS3 amazonS3;
-
-    @Value("${amazon.url}")
-    private String amazonUrl;
-
-    @Value("${aws.s3.bucket.qaclide}")
-    private String bucketName;
+//    private final AmazonS3 amazonS3;
+//
+//    @Value("${amazon.url}")
+//    private String amazonUrl;
+//
+//    @Value("${aws.s3.bucket.qaclide}")
+//    private String bucketName;
 
     @Value("${tesseract.datapath}")
     private String tessDataPath;
 
-    private static final List<String> ALLOWED_TYPES = List.of(
-            "pdf","doc","docx","txt",
-            "jpg","jpeg","png","bmp",
-            "tiff","tif","gif","webp"
-    );
+//    private static final List<String> ALLOWED_TYPES = List.of(
+//            "pdf","doc","docx","txt",
+//            "jpg","jpeg","png","bmp",
+//            "tiff","tif","gif","webp"
+//    );
 
     // Used In HandleHazardOcr API
     private static final String PREVIEW = "preview";
     private static final String CONFIRM = "confirm";
 
-    // Upload API
-    @Override
-    public UploadResponseDto uploadSds(UploadRequestDto request) {
-
-        UploadResponseDto response = new UploadResponseDto();
-
-        try {
-            MultipartFile file = request.getFile();
-
-            if (file == null || file.isEmpty()) {
-                throw new RuntimeException("File is empty");
-            }
-
-            validateFileType(file);
-
-            String originalName = file.getOriginalFilename();
-            if (originalName == null) {
-                throw new RuntimeException("Invalid file name");
-            }
-
-            originalName = originalName
-                    .replace("\"", "")
-                    .replace("'", "")
-                    .replaceAll("[^a-zA-Z0-9\\.\\-]", "_");
-
-            String fileName = System.currentTimeMillis() + "_" + originalName;
-            String s3Key = "sds/" + fileName;
-
-            ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentLength(file.getSize());
-            metadata.setContentType(file.getContentType());
-
-            amazonS3.putObject(
-                    new PutObjectRequest(
-                            bucketName,
-                            s3Key,
-                            new ByteArrayInputStream(file.getBytes()),
-                            metadata
-                    )
-            );
-
-            String fileUrl = amazonS3.getUrl(bucketName, s3Key).toString();
-
-            String rawText = runOCR(file);
-            String cleanedText = cleanOcrText(rawText);
-            double confidenceScore = 0.90;
-
-            // ✅ Detect Section
-            String sectionType = detectSectionType(cleanedText);
-
-            if ("UNKNOWN".equals(sectionType)) {
-                response.setStatus("OCR_FAILED");
-                response.setMessage("Unable to detect section type");
-                response.setFileUrl(fileUrl);
-                return response;
-            }
-
-            String extractedProduct = extractProductIdentifier(cleanedText);
-            String productIdentifier = normalizeText(extractedProduct);
-
-            String sdsNumber = extractSdsNumber(cleanedText);
-
-            if (sdsNumber == null || sdsNumber.isBlank() || sdsNumber.equalsIgnoreCase("Number")) {
-                sdsNumber = "SDS_" + System.currentTimeMillis();
-            }
-
-            String manufacturerInfo = extractManufacturerInfo(cleanedText);
-
-            if ((productIdentifier == null || productIdentifier.isBlank())
-                    && !"SECTION_2".equals(sectionType)) {
-
-                response.setStatus("OCR_FAILED");
-                response.setMessage("Product Identifier not detected.");
-                response.setFileUrl(fileUrl);
-                return response;
-            }
-
-            if (productIdentifier == null || productIdentifier.isBlank()) {
-                productIdentifier = "UNKNOWN_PRODUCT";
-            }
-
-            UploadProjection duplicate =
-                    uploadRepository.findDuplicateSds(productIdentifier, sdsNumber);
-
-            if (duplicate != null) {
-                uploadRepository.logDuplicate(productIdentifier, duplicate.getSdsId(), "UPLOAD_BLOCKED");
-
-                response.setStatus("DUPLICATE");
-                response.setSdsId(duplicate.getSdsId());
-                response.setMessage("Already exists. Duplicate upload not allowed.");
-                response.setFileUrl(fileUrl);
-                return response;
-            }
-
-            // ✅ Insert master
-            uploadRepository.insertSdsMaster(productIdentifier, sdsNumber, manufacturerInfo, 1L);
-            Long sdsId = uploadRepository.getSdsId(productIdentifier, sdsNumber);
-
-            // ✅ Insert version
-            uploadRepository.insertVersion(sdsId, 1, fileUrl, "Initial Upload", 1L);
-            Long versionId = uploadRepository.getVersionId(sdsId);
-
-            // =========================
-            // ✅ SAFE SECTION HANDLING
-            // =========================
-            try {
-
-                switch (sectionType) {
-
-                    case "SECTION_1":
-                        uploadRepository.insertSection1(
-                                sdsId,
-                                versionId,
-                                productIdentifier,
-                                null,
-                                sdsNumber,
-                                null,
-                                null,
-                                manufacturerInfo,
-                                "OCR"
-                        );
-                        break;
-
-                    case "SECTION_2":
-
-                        //  prevent DB overflow
-                        cleanedText = cleanedText.length() > 2000
-                                ? cleanedText.substring(0, 2000)
-                                : cleanedText;
-
-                        handleSection2(cleanedText, sdsId, versionId);
-                        break;
-                }
-
-            } catch (Exception ex) {
-                System.out.println("❌ Section processing failed: " + ex.getMessage());
-
-                response.setStatus("SECTION_FAILED");
-                response.setMessage("Section processing failed: " + ex.getMessage());
-                response.setSdsId(sdsId);
-                response.setFileUrl(fileUrl);
-                return response;
-            }
-
-            // =========================
-            // ✅ OCR MERGE
-            // =========================
-            SdsOcrResult existingOcr = ocrRepository.findTopBySdsIdOrderByCreatedAtDesc(sdsId);
-            if (existingOcr != null) {
-                rawText = existingOcr.getRawText() + "\n" + rawText;
-            }
-
-            uploadRepository.saveOcrResult(sdsId, versionId, rawText, confidenceScore);
-            uploadRepository.insertAuditLog(sdsId, "UPLOAD", 1L, "New SDS uploaded via OCR");
-
-            response.setStatus("SUCCESS");
-            response.setSdsId(sdsId);
-            response.setVersion(1);
-            response.setFileUrl(fileUrl);
-            response.setMessage("SDS uploaded successfully");
-
-            return response;
-
-        } catch (Exception e) {
-            e.printStackTrace(); // 🔥 VERY IMPORTANT
-            throw new RuntimeException("Upload failed: " + e.getMessage());
-        }
-    }
-    //    @Override
+//    // Upload API
+//    @Override
 //    public UploadResponseDto uploadSds(UploadRequestDto request) {
 //
 //        UploadResponseDto response = new UploadResponseDto();
+//
 //        try {
 //            MultipartFile file = request.getFile();
 //
@@ -341,7 +175,7 @@ public class SdsServiceImpl implements SdsService {
 //            String cleanedText = cleanOcrText(rawText);
 //            double confidenceScore = 0.90;
 //
-//            // ✅ AUTO DETECT SECTION
+//            // ✅ Detect Section
 //            String sectionType = detectSectionType(cleanedText);
 //
 //            if ("UNKNOWN".equals(sectionType)) {
@@ -356,14 +190,12 @@ public class SdsServiceImpl implements SdsService {
 //
 //            String sdsNumber = extractSdsNumber(cleanedText);
 //
-//            // ✅ FINAL FIX (IMPORTANT)
 //            if (sdsNumber == null || sdsNumber.isBlank() || sdsNumber.equalsIgnoreCase("Number")) {
 //                sdsNumber = "SDS_" + System.currentTimeMillis();
 //            }
 //
 //            String manufacturerInfo = extractManufacturerInfo(cleanedText);
 //
-//            // allow Section 2 without Section 1
 //            if ((productIdentifier == null || productIdentifier.isBlank())
 //                    && !"SECTION_2".equals(sectionType)) {
 //
@@ -390,46 +222,65 @@ public class SdsServiceImpl implements SdsService {
 //                return response;
 //            }
 //
-//            // insert master
+//            // ✅ Insert master
 //            uploadRepository.insertSdsMaster(productIdentifier, sdsNumber, manufacturerInfo, 1L);
-//
 //            Long sdsId = uploadRepository.getSdsId(productIdentifier, sdsNumber);
 //
-//            // insert version
+//            // ✅ Insert version
 //            uploadRepository.insertVersion(sdsId, 1, fileUrl, "Initial Upload", 1L);
-//
 //            Long versionId = uploadRepository.getVersionId(sdsId);
 //
-//            // ✅ AUTO SWITCH
-//            switch (sectionType) {
+//            // =========================
+//            // ✅ SAFE SECTION HANDLING
+//            // =========================
+//            try {
 //
-//                case "SECTION_1":
-//                    uploadRepository.insertSection1(
-//                            sdsId,
-//                            versionId,
-//                            productIdentifier,
-//                            null,
-//                            sdsNumber,
-//                            null,
-//                            null,
-//                            manufacturerInfo,
-//                            "OCR"
-//                    );
-//                    break;
+//                switch (sectionType) {
 //
-//                case "SECTION_2":
-//                    handleSection2(cleanedText, sdsId, versionId);
-//                    break;
+//                    case "SECTION_1":
+//                        uploadRepository.insertSection1(
+//                                sdsId,
+//                                versionId,
+//                                productIdentifier,
+//                                null,
+//                                sdsNumber,
+//                                null,
+//                                null,
+//                                manufacturerInfo,
+//                                "OCR"
+//                        );
+//                        break;
+//
+//                    case "SECTION_2":
+//
+//                        //  prevent DB overflow
+//                        cleanedText = cleanedText.length() > 2000
+//                                ? cleanedText.substring(0, 2000)
+//                                : cleanedText;
+//
+//                        handleSection2(cleanedText, sdsId, versionId);
+//                        break;
+//                }
+//
+//            } catch (Exception ex) {
+//                System.out.println("❌ Section processing failed: " + ex.getMessage());
+//
+//                response.setStatus("SECTION_FAILED");
+//                response.setMessage("Section processing failed: " + ex.getMessage());
+//                response.setSdsId(sdsId);
+//                response.setFileUrl(fileUrl);
+//                return response;
 //            }
 //
-//            // merge OCR text
+//            // =========================
+//            // ✅ OCR MERGE
+//            // =========================
 //            SdsOcrResult existingOcr = ocrRepository.findTopBySdsIdOrderByCreatedAtDesc(sdsId);
 //            if (existingOcr != null) {
 //                rawText = existingOcr.getRawText() + "\n" + rawText;
 //            }
 //
 //            uploadRepository.saveOcrResult(sdsId, versionId, rawText, confidenceScore);
-//
 //            uploadRepository.insertAuditLog(sdsId, "UPLOAD", 1L, "New SDS uploaded via OCR");
 //
 //            response.setStatus("SUCCESS");
@@ -441,10 +292,10 @@ public class SdsServiceImpl implements SdsService {
 //            return response;
 //
 //        } catch (Exception e) {
+//            e.printStackTrace(); // 🔥 VERY IMPORTANT
 //            throw new RuntimeException("Upload failed: " + e.getMessage());
 //        }
 //    }
-//
 
     // UpdateSection1 API
     @Transactional
@@ -650,9 +501,69 @@ public class SdsServiceImpl implements SdsService {
     }
 
     // CreateVersion API
+//    @Override
+//    @Transactional
+//    public CreateVersionResponseDto createVersion(Long sdsId, CreateVersionRequestDto request) {
+//
+//        CreateVersionProjection current =
+//                createVersionRepository.getCurrentVersion(sdsId);
+//
+//        if (current == null) {
+//            throw new RuntimeException("SDS not found");
+//        }
+//
+//        if (request.getFile() == null || request.getFile().isEmpty()) {
+//            throw new RuntimeException("File is empty or not provided");
+//        }
+//
+//        Integer newVersion = current.getCurrentVersion() + 1;
+//
+//        MultipartFile file = request.getFile();
+//
+//        try {
+//
+//            String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+//
+//            ObjectMetadata metadata = new ObjectMetadata();
+//            metadata.setContentLength(file.getSize());
+//            metadata.setContentType(file.getContentType());
+//
+//            amazonS3.putObject(
+//                    bucketName,
+//                    fileName,
+//                    file.getInputStream(),
+//                    metadata
+//            );
+//
+//            String fileUrl = amazonS3.getUrl(bucketName, fileName).toString();
+//
+//            createVersionRepository.insertNewVersion(
+//                    sdsId,
+//                    newVersion,
+//                    fileUrl,
+//                    request.getChangeNotes(),
+//                    request.getUploadedBy()
+//            );
+//
+//            createVersionRepository.updateCurrentVersion(sdsId, newVersion);
+//
+//            return CreateVersionResponseDto.builder()
+//                    .sdsId(sdsId)
+//                    .version(newVersion)
+//                    .fileUrl(fileUrl)
+//                    .message("New version created successfully")
+//                    .build();
+//
+//        } catch (Exception e) {
+//            throw new RuntimeException("File upload failed", e);
+//        }
+//    }
+
     @Override
     @Transactional
-    public CreateVersionResponseDto createVersion(Long sdsId, CreateVersionRequestDto request) {
+    public CreateVersionResponseDto createVersion(
+            Long sdsId,
+            CreateVersionRequestDto request) {
 
         CreateVersionProjection current =
                 createVersionRepository.getCurrentVersion(sdsId);
@@ -661,50 +572,56 @@ public class SdsServiceImpl implements SdsService {
             throw new RuntimeException("SDS not found");
         }
 
-        if (request.getFile() == null || request.getFile().isEmpty()) {
-            throw new RuntimeException("File is empty or not provided");
+        if (request.getFile() == null ||
+                request.getFile().isEmpty()) {
+
+            throw new RuntimeException(
+                    "File is empty or not provided");
         }
 
-        Integer newVersion = current.getCurrentVersion() + 1;
+        Integer newVersion =
+                current.getCurrentVersion() + 1;
 
         MultipartFile file = request.getFile();
 
         try {
 
-            String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+            String fileName =
+                    file.getOriginalFilename();
 
-            ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentLength(file.getSize());
-            metadata.setContentType(file.getContentType());
+            String fileType =
+                    file.getContentType();
 
-            amazonS3.putObject(
-                    bucketName,
-                    fileName,
-                    file.getInputStream(),
-                    metadata
-            );
-
-            String fileUrl = amazonS3.getUrl(bucketName, fileName).toString();
+            byte[] fileData =
+                    file.getBytes();
 
             createVersionRepository.insertNewVersion(
                     sdsId,
                     newVersion,
-                    fileUrl,
+                    fileName,
+                    fileType,
+                    fileData,
                     request.getChangeNotes(),
                     request.getUploadedBy()
             );
 
-            createVersionRepository.updateCurrentVersion(sdsId, newVersion);
+            createVersionRepository.updateCurrentVersion(
+                    sdsId,
+                    newVersion
+            );
 
             return CreateVersionResponseDto.builder()
                     .sdsId(sdsId)
                     .version(newVersion)
-                    .fileUrl(fileUrl)
                     .message("New version created successfully")
                     .build();
 
         } catch (Exception e) {
-            throw new RuntimeException("File upload failed", e);
+
+            throw new RuntimeException(
+                    "File upload failed",
+                    e
+            );
         }
     }
 
@@ -1030,16 +947,16 @@ public class SdsServiceImpl implements SdsService {
                 .build();
     }
 
-    // Helper Code
-    // ✅ Validate file type
-    private void validateFileType(MultipartFile file){
-        String name = file.getOriginalFilename();
-        if(name == null) throw new RuntimeException("Invalid file name");
-        if(!name.contains(".")) throw new RuntimeException("File extension missing");
-
-        String extension = name.substring(name.lastIndexOf(".")+1).toLowerCase();
-        if(!ALLOWED_TYPES.contains(extension)) throw new RuntimeException("Unsupported file type");
-    }
+//    // Helper Code
+//    // ✅ Validate file type
+//    private void validateFileType(MultipartFile file){
+//        String name = file.getOriginalFilename();
+//        if(name == null) throw new RuntimeException("Invalid file name");
+//        if(!name.contains(".")) throw new RuntimeException("File extension missing");
+//
+//        String extension = name.substring(name.lastIndexOf(".")+1).toLowerCase();
+//        if(!ALLOWED_TYPES.contains(extension)) throw new RuntimeException("Unsupported file type");
+//    }
 
     // ✅ Route OCR
     private String runOCR(MultipartFile file) throws Exception {

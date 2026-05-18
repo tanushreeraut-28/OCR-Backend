@@ -51,11 +51,11 @@ public interface SdsApi {
         return Optional.empty();
     }
 
-    /* ================= SDS Upload API ================= */
-    @Operation(summary = "Upload SDS File", description = "Upload SDS document")
-    @ApiResponses({ @ApiResponse(responseCode = "200", description = "Upload Success"), @ApiResponse(responseCode = "500", description = "Internal Server Error")})
-    @PostMapping(value = "/sds/upload", consumes = "multipart/form-data", produces = "application/json")
-    ResponseEntity<UploadResponseDto> uploadSds(@ModelAttribute UploadRequestDto request);
+//    /* ================= SDS Upload API ================= */
+//    @Operation(summary = "Upload SDS File", description = "Upload SDS document")
+//    @ApiResponses({ @ApiResponse(responseCode = "200", description = "Upload Success"), @ApiResponse(responseCode = "500", description = "Internal Server Error")})
+//    @PostMapping(value = "/sds/upload", consumes = "multipart/form-data", produces = "application/json")
+//    ResponseEntity<UploadResponseDto> uploadSds(@ModelAttribute UploadRequestDto request);
 
     /* ================= Details API ================= */
     @Operation(summary = "Details of SDS File", description = "Details of SDS document")

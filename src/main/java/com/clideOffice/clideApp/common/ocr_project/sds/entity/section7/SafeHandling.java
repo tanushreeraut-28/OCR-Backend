@@ -3,6 +3,8 @@ package com.clideOffice.clideApp.common.ocr_project.sds.entity.section7;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.sql.Timestamp;
+
 @Entity
 @Table(name = "sds_safe_handling")
 @Data
@@ -29,4 +31,22 @@ public class SafeHandling {
     @Column(columnDefinition = "TEXT")
     private String firePrevention;
 
+    // FILE
+
+    @Lob
+    @Column(columnDefinition = "LONGBLOB")
+    private byte[] fileData;
+
+    private String fileName;
+
+    private String fileType;
+
+    @Column(unique = true)
+    private String fileHash;
+
+    private Boolean isActive;
+
+    private Timestamp createdAt;
+
+    private Timestamp updatedAt;
 }

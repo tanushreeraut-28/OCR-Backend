@@ -15,4 +15,7 @@ public interface Section10Service {
 
     // SDS Upload API 12, 13, 14
     UploadSdsResponseDto uploadSection12And13And14(UploadRequestDto request);
+
+    // SDS Upload API 7, 8
+    UploadSdsResponseDto uploadSection7And8(UploadRequestDto request);
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.security.Timestamp;
 import java.util.List;
 
 @Entity
@@ -23,4 +24,21 @@ public class Section8 {
 
     @OneToOne(mappedBy = "section8", cascade = CascadeType.ALL)
     private EngineeringControl engineeringControl;
+
+    @Lob
+    @Column(columnDefinition = "LONGBLOB")
+    private byte[] fileData;
+
+    private String fileName;
+
+    private String fileType;
+
+    @Column(unique = true)
+    private String fileHash;
+
+    private Boolean isActive;
+
+    private Timestamp createdAt;
+
+    private Timestamp updatedAt;
 }

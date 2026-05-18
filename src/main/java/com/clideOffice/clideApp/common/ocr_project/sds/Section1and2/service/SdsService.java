@@ -26,7 +26,7 @@ import com.clideOffice.clideApp.common.ocr_project.sds.responseDto.UploadRespons
 //@RestController
 public interface SdsService {
 
-	UploadResponseDto uploadSds(UploadRequestDto request);
+//	UploadResponseDto uploadSds(UploadRequestDto request);
 	
 	UpdateSection1ResponseDto updateSection1(Long sdsId, UpdateSection1RequestDto request);
 	

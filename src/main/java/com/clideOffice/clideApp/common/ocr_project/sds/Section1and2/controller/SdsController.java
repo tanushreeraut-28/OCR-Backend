@@ -50,27 +50,27 @@ public class SdsController implements SdsApi {
 //            this.sdsService = sdsService;
 //	}
 
-	/* ================= SDS Upload API ================= */
-	@Override
-	public ResponseEntity<UploadResponseDto> uploadSds(UploadRequestDto request) {
-	    try {
-	        UploadResponseDto response = sdsService.uploadSds(request);
-	        // ✅ HANDLE DIFFERENT STATUSES
-	        if ("DUPLICATE".equalsIgnoreCase(response.getStatus())) {
-	            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-	        }
-	        if ("OCR_FAILED".equalsIgnoreCase(response.getStatus())) {
-	            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-	        }
-	        return ResponseEntity.ok(response);
-	    } catch (Exception e) {
-	        logger.error("Error occurred while uploading SDS", e);
-	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-	                .body(new UploadResponseDto());
-	    } finally {
-	        DatabaseContextHolder.clear();
-	    }
-	}
+//	/* ================= SDS Upload API ================= */
+//	@Override
+//	public ResponseEntity<UploadResponseDto> uploadSds(UploadRequestDto request) {
+//	    try {
+//	        UploadResponseDto response = sdsService.uploadSds(request);
+//	        // ✅ HANDLE DIFFERENT STATUSES
+//	        if ("DUPLICATE".equalsIgnoreCase(response.getStatus())) {
+//	            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+//	        }
+//	        if ("OCR_FAILED".equalsIgnoreCase(response.getStatus())) {
+//	            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//	        }
+//	        return ResponseEntity.ok(response);
+//	    } catch (Exception e) {
+//	        logger.error("Error occurred while uploading SDS", e);
+//	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//	                .body(new UploadResponseDto());
+//	    } finally {
+//	        DatabaseContextHolder.clear();
+//	    }
+//	}
 
 	/* ================= Details API ================= */
 	@Override
